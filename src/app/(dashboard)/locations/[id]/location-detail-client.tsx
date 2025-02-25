@@ -8,16 +8,14 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { EditLocationDialog } from "../components/edit-location-dialog";
 import { DeleteLocationDialog } from "../components/delete-location-dialog";
-import { AlertCircle, ArrowLeft, Edit, MapPin, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Edit, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -62,9 +60,7 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
     
     try {
       await deactivateLocation.mutateAsync(id);
-      // Refresh location data
-      const updatedLocation = await fetchLocation(id);
-      setLocation(updatedLocation);
+      setLocation((prev) => (prev ? { ...prev, active: false } : null));
     } catch (err) {
       console.error("Error deactivating location:", err);
     }
@@ -78,17 +74,21 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
     return (
       <div className="container mx-auto py-6">
         <div className="flex items-center mb-6">
-          <Button variant="outline" size="sm" onClick={handleBack} className="mr-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="mr-4"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
           </Button>
           <Skeleton className="h-8 w-64" />
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <div className="grid gap-6">
           <Skeleton className="h-[200px] w-full" />
-          <Skeleton className="h-[200px] w-full" />
-          <Skeleton className="h-[200px] w-full" />
+          <Skeleton className="h-[300px] w-full" />
         </div>
       </div>
     );
@@ -97,11 +97,11 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
   if (error || !location) {
     return (
       <div className="container mx-auto py-6">
-        <Button variant="outline" size="sm" onClick={handleBack} className="mb-6">
+        <Button variant="ghost" size="sm" onClick={handleBack} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver
         </Button>
-        
+
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
@@ -115,21 +115,26 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
 
   return (
     <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
-          <Button variant="outline" size="sm" onClick={handleBack} className="mr-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="mr-4"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{location.name}</h1>
-            <div className="flex items-center text-muted-foreground">
-              <MapPin className="h-4 w-4 mr-1" />
-              <span>{location.city}{location.state ? `, ${location.state}` : ''}{location.country ? `, ${location.country}` : ''}</span>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold">{location.name}</h1>
+          <Badge
+            variant={location.active ? "default" : "destructive"}
+            className="ml-2"
+          >
+            {location.active ? "Activo" : "Inactivo"}
+          </Badge>
         </div>
-        
+
         <div className="flex space-x-2">
           <Button
             variant="outline"
@@ -139,54 +144,56 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
             <Edit className="h-4 w-4 mr-2" />
             Editar
           </Button>
-          {location.active ? (
+
+          {location.active && (
             <Button
               variant="outline"
               size="sm"
               onClick={handleDeactivate}
-              disabled={isDeactivating || (stats && stats.activeRoutesCount > 0)}
+              disabled={
+                isDeactivating || !!(stats && stats.activeRoutesCount > 0)
+              }
             >
               Desactivar
             </Button>
-          ) : (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setShowDeleteDialog(true)}
-              disabled={(stats && stats.totalRoutesCount > 0)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Eliminar
-            </Button>
           )}
+
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+            disabled={!!(stats && stats.totalRoutesCount > 0)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Eliminar
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      {/* Location details */}
+      <div className="grid gap-6 mb-6">
         <Card>
           <CardHeader>
             <CardTitle>Información General</CardTitle>
+            <CardDescription>Detalles de la ubicación</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Tipo</p>
-              <Badge variant="outline" className="mt-1">
-                {location.type === "terminal" ? "Terminal" : 
-                 location.type === "stop" ? "Parada" : 
-                 location.type === "office" ? "Oficina" : location.type}
-              </Badge>
-            </div>
-            
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Dirección</p>
-              <p>{location.address || "No especificada"}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Estado</p>
-              <Badge variant={location.active ? "default" : "destructive"}>
-                {location.active ? "Activo" : "Inactivo"}
-              </Badge>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Nombre
+                </p>
+                <p className="text-lg font-medium">{location.name}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Estado
+                </p>
+                <Badge variant={location.active ? "default" : "destructive"}>
+                  {location.active ? "Activo" : "Inactivo"}
+                </Badge>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -194,49 +201,42 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
         <Card>
           <CardHeader>
             <CardTitle>Estadísticas</CardTitle>
+            <CardDescription>Uso de la ubicación en el sistema</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total de Rutas</p>
-              <p className="text-2xl font-bold">{stats?.totalRoutesCount || 0}</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Como Origen</p>
-                <p className="text-xl font-semibold">{stats?.originRoutesCount || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total de Rutas
+                </p>
+                <p className="text-2xl font-bold">
+                  {stats?.totalRoutesCount || 0}
+                </p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Como Destino</p>
-                <p className="text-xl font-semibold">{stats?.destinationRoutesCount || 0}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Rutas como Origen
+                </p>
+                <p className="text-2xl font-bold">
+                  {stats?.originRoutesCount || 0}
+                </p>
               </div>
-            </div>
-            
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Rutas Activas</p>
-              <p className="text-xl font-semibold">{stats?.activeRoutesCount || 0}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Programación</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total de Horarios</p>
-              <p className="text-2xl font-bold">{stats?.schedulesCount || 0}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Fecha de Creación</p>
-              <p>{new Date(location.createdAt).toLocaleDateString()}</p>
-            </div>
-            
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Última Actualización</p>
-              <p>{new Date(location.updatedAt).toLocaleDateString()}</p>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Rutas como Destino
+                </p>
+                <p className="text-2xl font-bold">
+                  {stats?.destinationRoutesCount || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Horarios
+                </p>
+                <p className="text-2xl font-bold">
+                  {stats?.schedulesCount || 0}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -248,7 +248,7 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
           <TabsTrigger value="routes">Rutas</TabsTrigger>
           <TabsTrigger value="schedules">Horarios</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="routes" className="mt-4">
           <Card>
             <CardHeader>
@@ -259,14 +259,18 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
             </CardHeader>
             <CardContent>
               {stats?.totalRoutesCount === 0 ? (
-                <p className="text-muted-foreground">No hay rutas asociadas a esta ubicación</p>
+                <p className="text-muted-foreground">
+                  No hay rutas asociadas a esta ubicación
+                </p>
               ) : (
-                <p className="text-muted-foreground">Implementación de lista de rutas pendiente</p>
+                <p className="text-muted-foreground">
+                  Implementación de lista de rutas pendiente
+                </p>
               )}
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="schedules" className="mt-4">
           <Card>
             <CardHeader>
@@ -277,9 +281,13 @@ export default function LocationDetailClient({ id }: LocationDetailClientProps) 
             </CardHeader>
             <CardContent>
               {stats?.schedulesCount === 0 ? (
-                <p className="text-muted-foreground">No hay horarios programados para esta ubicación</p>
+                <p className="text-muted-foreground">
+                  No hay horarios programados para esta ubicación
+                </p>
               ) : (
-                <p className="text-muted-foreground">Implementación de lista de horarios pendiente</p>
+                <p className="text-muted-foreground">
+                  Implementación de lista de horarios pendiente
+                </p>
               )}
             </CardContent>
           </Card>

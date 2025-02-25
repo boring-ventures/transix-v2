@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useLocations, type Location, type LocationFormData } from "@/hooks/use-locations";
+import { useLocations, type Location } from "@/hooks/use-locations";
 import {
   Dialog,
   DialogContent,
@@ -72,7 +72,10 @@ export function EditLocationDialog({
     try {
       await updateLocation.mutateAsync({
         id: location.id,
-        ...data,
+        data: {
+          name: data.name,
+          active: data.active,
+        },
       });
       
       onOpenChange(false);

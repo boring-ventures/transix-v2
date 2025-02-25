@@ -73,11 +73,6 @@ export async function PATCH(
       where: { id: locationId },
       data: {
         name: data.name,
-        address: data.address,
-        city: data.city,
-        state: data.state,
-        country: data.country,
-        type: data.type,
         active: data.active,
       },
     });

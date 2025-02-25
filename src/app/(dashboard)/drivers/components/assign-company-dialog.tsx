@@ -70,7 +70,7 @@ export function AssignCompanyDialog({
         companyId: data.companyId,
       });
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       setError("Error al asignar empresa. Por favor, inténtelo de nuevo.");
     }
   };

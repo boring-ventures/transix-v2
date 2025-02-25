@@ -123,10 +123,10 @@ export function useLocations(fetchInactive = false) {
         description: "Ubicación desactivada exitosamente",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Error al desactivar la ubicación",
+        description: error.message || "Error al desactivar la ubicación",
         variant: "destructive",
       });
     },
@@ -145,10 +145,10 @@ export function useLocations(fetchInactive = false) {
         description: "Ubicación eliminada exitosamente",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Error al eliminar la ubicación",
+        description: error.message || "Error al eliminar la ubicación",
         variant: "destructive",
       });
     },

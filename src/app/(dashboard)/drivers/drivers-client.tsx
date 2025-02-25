@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDrivers, type Driver } from "@/hooks/use-drivers";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import { DataTable } from "@/components/table/data-table";
 import { LoadingTable } from "@/components/table/loading-table";
 import { CreateDriverDialog } from "./components/create-driver-dialog";
