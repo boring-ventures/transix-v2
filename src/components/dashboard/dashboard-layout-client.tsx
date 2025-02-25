@@ -39,7 +39,9 @@ export function DashboardLayoutClient({ children }: DashboardLayoutProps) {
               <ProfileDropdown />
             </div>
           </Header>
-          {children}
+          <div className="flex-1 p-4 md:p-6 lg:p-8">
+            {children}
+          </div>
         </div>
       </SidebarProvider>
     </SearchProvider>
