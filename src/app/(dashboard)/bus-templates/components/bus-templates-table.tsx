@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/table/data-table";
 import { CompactSeatMatrix } from "./compact-seat-matrix";
+import { DeleteBusTemplateDialog } from "./delete-bus-template-dialog";
 import type { Column } from "@/components/table/types";
 import type { SeatTemplateMatrix } from "@/hooks/use-bus-templates";
 
@@ -40,6 +42,7 @@ export function BusTemplatesTable({
   onAdd 
 }: BusTemplatesTableProps) {
   const router = useRouter();
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
   const columns: Column<BusTemplate>[] = [
     {
@@ -106,22 +109,30 @@ export function BusTemplatesTable({
   ];
 
   return (
-    <DataTable
-      title={title}
-      description={description}
-      data={data}
-      columns={columns}
-      searchable={true}
-      searchField="name"
-      rowSelection={false}
-      onRowClick={(row) => router.push(`/bus-templates/${row.id}`)}
-      onAdd={onAdd}
-      customActions={[
-        {
-          label: "Ver",
-          onClick: (row) => router.push(`/bus-templates/${row.id}`),
-        },
-      ]}
-    />
+    <>
+      <DataTable
+        title={title}
+        description={description}
+        data={data}
+        columns={columns}
+        searchable={true}
+        searchField="name"
+        rowSelection={false}
+        onRowClick={(row) => router.push(`/bus-templates/${row.id}`)}
+        onAdd={onAdd}
+        onDelete={(row) => setTemplateToDelete(row.id)}
+        customActions={[
+          {
+            label: "Ver",
+            onClick: (row) => router.push(`/bus-templates/${row.id}`),
+          },
+        ]}
+      />
+
+      <DeleteBusTemplateDialog
+        templateId={templateToDelete}
+        onClose={() => setTemplateToDelete(null)}
+      />
+    </>
   );
 }

@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Bus, Building } from "lucide-react";
+import { ArrowLeft, Bus, Building, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { SeatMatrixViewer } from "../components/seat-matrix-viewer";
+import { DeleteBusTemplateDialog } from "../components/delete-bus-template-dialog";
 
 interface BusTemplateDetailClientProps {
   id: string;
@@ -31,6 +32,7 @@ export default function BusTemplateDetailClient({
   const [template, setTemplate] = useState<BusTemplate | null>(null);
   const { seatTiers } = useSeatTiers(template?.companyId);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     const loadTemplateData = async () => {
@@ -80,6 +82,14 @@ export default function BusTemplateDetailClient({
               <Badge variant={template.isActive ? "default" : "destructive"}>
                 {template.isActive ? "Activo" : "Inactivo"}
               </Badge>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar
+              </Button>
             </div>
           </div>
 
@@ -206,6 +216,11 @@ export default function BusTemplateDetailClient({
               </Card>
             </TabsContent>
           </Tabs>
+
+          <DeleteBusTemplateDialog
+            templateId={showDeleteDialog ? template.id : null}
+            onClose={() => setShowDeleteDialog(false)}
+          />
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-12">
