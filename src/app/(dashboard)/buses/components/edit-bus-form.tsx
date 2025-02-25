@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -73,6 +73,18 @@ export function EditBusForm({ bus }: EditBusFormProps) {
     },
   });
 
+  useEffect(() => {
+    if (bus) {
+      form.reset({
+        plateNumber: bus.plateNumber,
+        companyId: bus.companyId,
+        templateId: bus.templateId,
+        maintenanceStatus: bus.maintenanceStatus,
+        isActive: bus.isActive,
+      });
+    }
+  }, [bus, form]);
+
   // Filter templates by company
   const filteredTemplates = templates.filter(
     (template: BusTemplate) => !selectedCompanyId || template.companyId === selectedCompanyId
@@ -107,7 +119,7 @@ export function EditBusForm({ bus }: EditBusFormProps) {
     }
   };
 
-  const handleMaintenanceStatusChange = async (status: string) => {
+  const handleUpdateMaintenanceStatus = async (status: MaintenanceStatus) => {
     try {
       await updateMaintenanceStatus.mutateAsync({
         id: bus.id,
@@ -327,21 +339,21 @@ export function EditBusForm({ bus }: EditBusFormProps) {
                   <div className="flex flex-col space-y-2">
                     <Button 
                       variant={bus.maintenanceStatus === "active" ? "default" : "outline"}
-                      onClick={() => handleMaintenanceStatusChange("active")}
+                      onClick={() => handleUpdateMaintenanceStatus("active")}
                       disabled={isUpdatingMaintenance || bus.maintenanceStatus === "active"}
                     >
                       Marcar como Operativo
                     </Button>
                     <Button 
                       variant={bus.maintenanceStatus === "in_maintenance" ? "default" : "outline"}
-                      onClick={() => handleMaintenanceStatusChange("in_maintenance")}
+                      onClick={() => handleUpdateMaintenanceStatus("in_maintenance")}
                       disabled={isUpdatingMaintenance || bus.maintenanceStatus === "in_maintenance"}
                     >
                       Marcar como En Mantenimiento
                     </Button>
                     <Button 
                       variant={bus.maintenanceStatus === "retired" ? "default" : "destructive"}
-                      onClick={() => handleMaintenanceStatusChange("retired")}
+                      onClick={() => handleUpdateMaintenanceStatus("retired")}
                       disabled={isUpdatingMaintenance || bus.maintenanceStatus === "retired"}
                     >
                       Marcar como Retirado
