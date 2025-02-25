@@ -120,6 +120,12 @@ export function EditProfileDialog({
     
     setError(null);
     try {
+      // If changing to superadmin, ensure company and branch are null
+      if (data.role === "superadmin") {
+        data.companyId = undefined;
+        data.branchId = undefined;
+      }
+      
       // First update the profile basic info
       await updateProfile.mutateAsync({
         id: profile.userId,
@@ -128,26 +134,19 @@ export function EditProfileDialog({
           email: data.email,
           role: data.role,
           active: data.active,
+          // If user is now a superadmin, explicitly set company and branch to null
+          companyId: data.role === "superadmin" ? null : data.companyId,
+          branchId: data.role === "superadmin" ? null : data.branchId,
         } as ProfileFormData,
       });
       
-      // Then update company assignment if needed (and not superadmin)
-      if (!isSuperAdmin) {
-        // Only call assignCompany if the company or branch has changed
-        if (data.companyId !== profile.companyId || data.branchId !== profile.branchId) {
-          await assignCompany.mutateAsync({
-            id: profile.userId,
-            companyId: data.companyId || undefined,
-            branchId: data.branchId || undefined,
-            role: data.role,
-          });
-        }
-      } else if (profile.companyId) {
-        // If user is now a superadmin but had a company before, remove company assignment
+      // Only handle company assignment for non-superadmin roles
+      if (data.role !== "superadmin" && 
+          (data.companyId !== profile.companyId || data.branchId !== profile.branchId)) {
         await assignCompany.mutateAsync({
           id: profile.userId,
-          companyId: undefined,
-          branchId: undefined,
+          companyId: data.companyId || undefined,
+          branchId: data.branchId || undefined,
           role: data.role,
         });
       }

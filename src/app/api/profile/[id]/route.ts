@@ -167,16 +167,20 @@ export async function DELETE(
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // Delete profile
-    await prisma.profile.delete({
+    // Instead of deleting, mark as inactive
+    const deactivatedProfile = await prisma.profile.update({
       where: { userId: id },
+      data: {
+        active: false,
+      },
     });
 
     return NextResponse.json({
-      message: "Profile deleted successfully",
+      message: "Profile deactivated successfully",
+      profile: deactivatedProfile,
     });
   } catch (error) {
-    console.error("Error deleting profile:", error);
+    console.error("Error deactivating profile:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
