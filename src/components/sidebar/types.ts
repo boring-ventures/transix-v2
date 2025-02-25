@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Role } from "@prisma/client";
+import type { Role } from "@prisma/client";
 
 interface User {
   name: string;
