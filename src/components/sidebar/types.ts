@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { Role } from "@prisma/client";
+import type React from "react";
 
 interface User {
   name: string;
@@ -29,11 +30,23 @@ export interface NavCollapsible extends BaseNavItem {
   url?: never;
 }
 
-export type NavItem = NavLink | NavCollapsible;
+export interface NavItem {
+  title: string;
+  url: string;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  badge?: string;
+  items?: {
+    title: string;
+    url: string;
+    icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  }[];
+}
 
 export interface NavGroup {
   title: string;
   items: NavItem[];
+  requiredRole?: string[];
+  public?: boolean;
 }
 
 export interface SidebarData {

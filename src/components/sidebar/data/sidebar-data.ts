@@ -1,23 +1,19 @@
 import {
-  AlertCircle,
-  AppWindow,
-  Ban,
-  BellRing,
   Bus,
-  CheckSquare,
   Command,
-  FileText,
-  HelpCircle,
   LayoutDashboard,
-  Map,
+  Map as MapIcon,
   MapPin,
-  MessageSquare,
-  Settings,
   Ticket,
   Users,
   Building,
   CreditCard,
   User,
+  List,
+  ShoppingCart,
+  Route,
+  BusFront,
+  FileSpreadsheet,
 } from "lucide-react";
 import type { SidebarData } from "../types";
 
@@ -51,10 +47,12 @@ export const sidebarData: SidebarData = {
             {
               title: "Vender Tickets",
               url: "/tickets/sell",
+              icon: ShoppingCart,
             },
             {
               title: "Lista de Tickets",
               url: "/tickets/list",
+              icon: List,
             },
           ],
         },
@@ -66,17 +64,19 @@ export const sidebarData: SidebarData = {
             {
               title: "Lista de Viajes",
               url: "/trips/list",
+              icon: List,
             },
           ],
         },
         {
           title: "Rutas",
           url: "/routes",
-          icon: Map,
+          icon: MapIcon,
           items: [
             {
               title: "Lista de Rutas",
               url: "/routes/list",
+              icon: Route,
             },
           ],
         },
@@ -88,18 +88,19 @@ export const sidebarData: SidebarData = {
         {
           title: "Buses",
           url: "/buses",
-          icon: Bus,
+          icon: BusFront,
           items: [
             {
               title: "Lista de Buses",
               url: "/buses/list",
+              icon: List,
             },
           ],
         },
         {
           title: "Plantillas",
           url: "/templates",
-          icon: FileText,
+          icon: FileSpreadsheet,
         },
         {
           title: "Conductores",

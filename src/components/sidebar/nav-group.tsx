@@ -29,12 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type {
-  NavCollapsible,
-  NavItem,
-  NavLink,
-  NavGroup as NavGroupType,
-} from "./types";
+import type { NavItem, NavGroup as NavGroupType } from "./types";
 
 export function NavGroup({ title, items }: NavGroupType) {
   const { state } = useSidebar();
@@ -74,15 +69,15 @@ const NavBadge = ({ children }: { children: ReactNode }) => (
   <Badge className="rounded-full px-1 py-0 text-xs">{children}</Badge>
 );
 
-function isNavLink(item: NavItem): item is NavLink {
-  return "url" in item;
+function isNavLink(item: NavItem): boolean {
+  return "url" in item && !item.items;
 }
 
 const SidebarMenuLink = ({
   item,
   pathname,
 }: {
-  item: NavLink;
+  item: NavItem;
   pathname: string;
 }) => {
   const { setOpenMobile } = useSidebar();
@@ -107,10 +102,12 @@ const SidebarMenuCollapsible = ({
   item,
   pathname,
 }: {
-  item: NavCollapsible;
+  item: NavItem;
   pathname: string;
 }) => {
   const { setOpenMobile } = useSidebar();
+  const items = item.items || [];
+
   return (
     <Collapsible
       asChild
@@ -128,7 +125,7 @@ const SidebarMenuCollapsible = ({
         </CollapsibleTrigger>
         <CollapsibleContent className="CollapsibleContent">
           <SidebarMenuSub>
-            {item.items.map((subItem: NavItem) => {
+            {items.map((subItem: NavItem) => {
               if (isNavLink(subItem)) {
                 return (
                   <SidebarMenuSubItem key={subItem.title}>
@@ -161,9 +158,11 @@ const SidebarMenuCollapsedDropdown = ({
   item,
   pathname,
 }: {
-  item: NavCollapsible;
+  item: NavItem;
   pathname: string;
 }) => {
+  const items = item.items || [];
+
   return (
     <SidebarMenuItem>
       <DropdownMenu>
@@ -183,7 +182,7 @@ const SidebarMenuCollapsedDropdown = ({
             {item.title} {item.badge ? `(${item.badge})` : ""}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {item.items.map((sub: NavItem) => {
+          {items.map((sub: NavItem) => {
             if (isNavLink(sub)) {
               return (
                 <DropdownMenuItem key={`${sub.title}-${sub.url}`} asChild>
@@ -193,7 +192,9 @@ const SidebarMenuCollapsedDropdown = ({
                   >
                     {sub.icon && <sub.icon />}
                     <span className="max-w-52 text-wrap">{sub.title}</span>
-                    {sub.badge && <span className="ml-auto text-xs">{sub.badge}</span>}
+                    {sub.badge && (
+                      <span className="ml-auto text-xs">{sub.badge}</span>
+                    )}
                   </Link>
                 </DropdownMenuItem>
               );
