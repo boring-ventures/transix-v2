@@ -3,34 +3,20 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 // Get all bus templates with optional filtering
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const name = searchParams.get("name");
-    const isActive = searchParams.get("isActive");
+    const { searchParams } = new URL(req.url);
     const companyId = searchParams.get("companyId");
-    const type = searchParams.get("type");
+    const isActive = searchParams.get("isActive") === "true";
     
-    const whereClause: Prisma.BusTypeTemplateWhereInput = {};
+    // Build the query
+    const query: Prisma.BusTypeTemplateWhereInput = {};
+    if (companyId) query.companyId = companyId;
+    if (isActive !== undefined) query.isActive = isActive;
     
-    if (name) {
-      whereClause.name = { contains: name, mode: 'insensitive' };
-    }
-    
-    if (isActive !== null) {
-      whereClause.isActive = isActive === "true";
-    }
-    
-    if (companyId) {
-      whereClause.companyId = companyId;
-    }
-    
-    if (type) {
-      whereClause.type = type;
-    }
-    
+    // Fetch templates
     const templates = await prisma.busTypeTemplate.findMany({
-      where: whereClause,
+      where: query,
       include: {
         company: true,
         _count: {
@@ -44,72 +30,71 @@ export async function GET(request: Request) {
       },
     });
     
-    return NextResponse.json({ templates });
+    // Parse JSON strings back to objects
+    const parsedTemplates = templates.map(template => ({
+      ...template,
+      seatTemplateMatrix: JSON.parse(template.seatTemplateMatrix as string),
+      seatsLayout: typeof template.seatsLayout === 'string' && template.seatsLayout.startsWith('{') 
+        ? JSON.parse(template.seatsLayout) 
+        : template.seatsLayout,
+    }));
+    
+    return NextResponse.json({ templates: parsedTemplates });
   } catch (error) {
     console.error("Error fetching bus templates:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Error fetching bus templates" },
       { status: 500 }
     );
   }
 }
 
 // Create a new bus template
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const json = await request.json();
-    const { 
-      name, 
-      description, 
-      companyId, 
-      totalCapacity, 
-      seatTemplateMatrix, 
-      isActive,
-      type,
-      seatsLayout
-    } = json;
+    const data = await req.json();
     
-    if (!name || !companyId || !totalCapacity || !seatTemplateMatrix || !type || !seatsLayout) {
+    // Validate the required fields
+    if (!data.name || !data.companyId) {
       return NextResponse.json(
-        { error: "Missing required template information" },
+        { error: "Nombre y empresa son requeridos" },
         { status: 400 }
       );
     }
     
-    // Check if company exists
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-    });
-    
-    if (!company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 }
-      );
-    }
+    // Convert complex objects to JSON strings for Prisma
+    const templateData = {
+      ...data,
+      // Convert the matrix to a JSON string
+      seatTemplateMatrix: JSON.stringify(data.seatTemplateMatrix),
+      // Convert the layout to a JSON string if it's an object
+      seatsLayout: typeof data.seatsLayout === 'object' 
+        ? JSON.stringify(data.seatsLayout) 
+        : data.seatsLayout,
+    };
     
     // Create template
     const template = await prisma.busTypeTemplate.create({
-      data: {
-        name,
-        description,
-        companyId,
-        totalCapacity,
-        seatTemplateMatrix,
-        isActive: isActive !== undefined ? isActive : true,
-        type,
-        seatsLayout,
-      },
+      data: templateData,
       include: {
         company: true,
       },
     });
     
-    return NextResponse.json({ template }, { status: 201 });
+    // Convert the JSON strings back to objects for the response
+    const responseTemplate = {
+      ...template,
+      seatTemplateMatrix: JSON.parse(template.seatTemplateMatrix as string),
+      seatsLayout: typeof template.seatsLayout === 'string' && template.seatsLayout.startsWith('{') 
+        ? JSON.parse(template.seatsLayout) 
+        : template.seatsLayout,
+    };
+    
+    return NextResponse.json({ template: responseTemplate });
   } catch (error) {
     console.error("Error creating bus template:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error instanceof Error ? error.message : "Error creating bus template" },
       { status: 500 }
     );
   }

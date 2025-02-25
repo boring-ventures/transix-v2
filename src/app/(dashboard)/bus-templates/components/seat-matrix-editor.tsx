@@ -15,6 +15,7 @@ import { ChevronDown } from "lucide-react";
 import type { SeatTier } from "@/hooks/use-seat-tiers";
 import { EditSeatDialog } from "./edit-seat-dialog";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SeatPosition {
   id: string;
@@ -144,7 +145,10 @@ export function SeatMatrixEditor({
         dimensions: secondFloorDimensions,
         seats: generateSeats(secondFloorDimensions, [], true),
       };
-    } 
+    } else if (!checked && updatedMatrix.secondFloor) {
+      // Remove the second floor completely
+      delete updatedMatrix.secondFloor;
+    }
     
     onChange(updatedMatrix);
   };
@@ -243,6 +247,29 @@ export function SeatMatrixEditor({
     setSelectedSeats([]);
   };
   
+  // Add this function to handle bulk assignment of seat tiers
+  const handleBulkAssignTier = (floorKey: "firstFloor" | "secondFloor", tierId: string) => {
+    const currentMatrix = { ...value };
+    const currentFloor = currentMatrix[floorKey];
+    
+    if (!currentFloor) return;
+    
+    // Update all non-empty seats with the selected tier
+    const updatedSeats = currentFloor.seats.map(seat => 
+      seat.isEmpty ? seat : { ...seat, tierId }
+    );
+    
+    const updatedMatrix = {
+      ...currentMatrix,
+      [floorKey]: {
+        ...currentFloor,
+        seats: updatedSeats,
+      },
+    };
+    
+    onChange(updatedMatrix);
+  };
+  
   // Render a seat
   const renderSeat = (seat: SeatPosition, floor: "firstFloor" | "secondFloor") => {
     const tier = seatTiers.find(t => t.id === seat.tierId);
@@ -292,47 +319,71 @@ export function SeatMatrixEditor({
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium">{floorName}</h3>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Label htmlFor={`${floorKey}-rows`}>Filas:</Label>
-              <Input
-                id={`${floorKey}-rows`}
-                type="number"
-                min={1}
-                max={20}
-                value={floorKey === "firstFloor" ? firstFloorDimensions.rows : secondFloorDimensions.rows}
-                onChange={(e) => {
-                  const newValue = Number.parseInt(e.target.value) || 1;
-                  if (floorKey === "firstFloor") {
-                    updateDimensions(floorKey, { ...firstFloorDimensions, rows: newValue });
-                  } else {
-                    updateDimensions(floorKey, { ...secondFloorDimensions, rows: newValue });
-                  }
-                }}
-                className="w-16"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor={`${floorKey}-cols`}>Asientos por fila:</Label>
-              <Input
-                id={`${floorKey}-cols`}
-                type="number"
-                min={1}
-                max={10}
-                value={floorKey === "firstFloor" ? firstFloorDimensions.seatsPerRow : secondFloorDimensions.seatsPerRow}
-                onChange={(e) => {
-                  const newValue = Number.parseInt(e.target.value) || 1;
-                  if (floorKey === "firstFloor") {
-                    updateDimensions(floorKey, { ...firstFloorDimensions, seatsPerRow: newValue });
-                  } else {
-                    updateDimensions(floorKey, { ...secondFloorDimensions, seatsPerRow: newValue });
-                  }
-                }}
-                className="w-16"
-              />
-            </div>
-          </div>
         </div>
+        
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <Label htmlFor={`${floorKey}-rows`}>Filas:</Label>
+            <Input
+              id={`${floorKey}-rows`}
+              type="number"
+              min={1}
+              max={20}
+              value={floorKey === "firstFloor" ? firstFloorDimensions.rows : secondFloorDimensions.rows}
+              onChange={(e) => {
+                const newValue = Number.parseInt(e.target.value) || 1;
+                if (floorKey === "firstFloor") {
+                  updateDimensions(floorKey, { ...firstFloorDimensions, rows: newValue });
+                } else {
+                  updateDimensions(floorKey, { ...secondFloorDimensions, rows: newValue });
+                }
+              }}
+              className="w-20"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Label htmlFor={`${floorKey}-cols`}>Asientos por fila:</Label>
+            <Input
+              id={`${floorKey}-cols`}
+              type="number"
+              min={1}
+              max={10}
+              value={floorKey === "firstFloor" ? firstFloorDimensions.seatsPerRow : secondFloorDimensions.seatsPerRow}
+              onChange={(e) => {
+                const newValue = Number.parseInt(e.target.value) || 1;
+                if (floorKey === "firstFloor") {
+                  updateDimensions(floorKey, { ...firstFloorDimensions, seatsPerRow: newValue });
+                } else {
+                  updateDimensions(floorKey, { ...secondFloorDimensions, seatsPerRow: newValue });
+                }
+              }}
+              className="w-20"
+            />
+          </div>
+          
+          
+        </div>
+        <div className="py-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Asignar Tipo a Todos <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {seatTiers.map(tier => (
+                  <DropdownMenuItem 
+                    key={tier.id}
+                    onClick={() => handleBulkAssignTier(floorKey, tier.id)}
+                  >
+                    {tier.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        
         <div className="space-y-2">
           {seatsByRow.map((rowSeats) => (
             <div key={`row-${rowSeats[0]?.row ?? Math.random()}`} className="flex gap-2">
@@ -345,10 +396,20 @@ export function SeatMatrixEditor({
   };
   
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
+            <Label htmlFor="has-second-floor">Bus de dos pisos</Label>
+            <Switch
+              id="has-second-floor"
+              checked={hasSecondFloor}
+              onCheckedChange={handleToggleSecondFloor}
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Label htmlFor="multi-select">Selección múltiple</Label>
             <Switch
               id="multi-select"
               checked={isMultiSelectMode}
@@ -357,19 +418,10 @@ export function SeatMatrixEditor({
                 if (!checked) setSelectedSeats([]);
               }}
             />
-            <Label htmlFor="multi-select">Selección múltiple</Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="second-floor"
-              checked={hasSecondFloor}
-              onCheckedChange={handleToggleSecondFloor}
-            />
-            <Label htmlFor="second-floor">Segundo piso</Label>
           </div>
         </div>
         
-        {selectedSeats.length > 0 && (
+        {isMultiSelectMode && selectedSeats.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
               {selectedSeats.length} asientos seleccionados
@@ -392,7 +444,7 @@ export function SeatMatrixEditor({
                     key={tier.id}
                     onClick={() => handleBulkAction("tier", tier.id)}
                   >
-                    Asignar nivel: {tier.name}
+                    Asignar tipo: {tier.name}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -401,8 +453,24 @@ export function SeatMatrixEditor({
         )}
       </div>
       
-      {renderFloor("firstFloor", "Primer Piso")}
-      {hasSecondFloor && renderFloor("secondFloor", "Segundo Piso")}
+      <Tabs defaultValue="firstFloor">
+        <TabsList className="mb-4">
+          <TabsTrigger value="firstFloor">Primer Piso</TabsTrigger>
+          {hasSecondFloor && (
+            <TabsTrigger value="secondFloor">Segundo Piso</TabsTrigger>
+          )}
+        </TabsList>
+        
+        <TabsContent value="firstFloor">
+          {renderFloor("firstFloor", "Primer Piso")}
+        </TabsContent>
+        
+        {hasSecondFloor && (
+          <TabsContent value="secondFloor">
+            {renderFloor("secondFloor", "Segundo Piso")}
+          </TabsContent>
+        )}
+      </Tabs>
       
       {selectedSeat && (
         <EditSeatDialog

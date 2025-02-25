@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useSeatTiers, type SeatTier, type SeatTierFormData } from "@/hooks/use-seat-tiers";
+import { useSeatTiers, type SeatTier } from "@/hooks/use-seat-tiers";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, Trash2, Edit } from "lucide-react";
+import { Loader2, Trash2, Edit } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import {
   Card,
@@ -93,17 +93,19 @@ export function ManageSeatTiersDialog({
     
     try {
       if (editingTier) {
-        await updateSeatTier({
+        await updateSeatTier.mutateAsync({
           id: editingTier.id,
-          ...data,
-          companyId,
+          data: {
+            ...data,
+            companyId,
+          },
         });
         toast({
           title: "Tipo de asiento actualizado",
           description: "El tipo de asiento ha sido actualizado exitosamente",
         });
       } else {
-        await createSeatTier({
+        await createSeatTier.mutateAsync({
           ...data,
           companyId,
         });
@@ -126,7 +128,7 @@ export function ManageSeatTiersDialog({
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteSeatTier(id);
+      await deleteSeatTier.mutateAsync(id);
       toast({
         title: "Tipo de asiento eliminado",
         description: "El tipo de asiento ha sido eliminado exitosamente",
@@ -142,18 +144,18 @@ export function ManageSeatTiersDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Gestionar Tipos de Asiento</DialogTitle>
           <DialogDescription>
-            Cree y gestione los tipos de asiento para esta empresa
+            Cree y administre los tipos de asiento para su empresa
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
           <div>
             <h3 className="text-lg font-medium mb-4">
-              {editingTier ? "Editar Tipo de Asiento" : "Nuevo Tipo de Asiento"}
+              {editingTier ? "Editar Tipo de Asiento" : "Crear Nuevo Tipo de Asiento"}
             </h3>
             
             <Form {...form}>
@@ -165,7 +167,7 @@ export function ManageSeatTiersDialog({
                     <FormItem>
                       <FormLabel>Nombre</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input {...field} placeholder="Ej: VIP, Económico, etc." />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -179,7 +181,7 @@ export function ManageSeatTiersDialog({
                     <FormItem>
                       <FormLabel>Descripción</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input {...field} placeholder="Descripción del tipo de asiento" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -191,12 +193,14 @@ export function ManageSeatTiersDialog({
                   name="basePrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Precio Base</FormLabel>
+                      <FormLabel>Precio Base ($)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
-                          {...field}
-                          onChange={(e) => field.onChange(Number.parseFloat(e.target.value))}
+                          min="0" 
+                          step="0.01" 
+                          {...field} 
+                          onChange={(e) => field.onChange(Number.parseFloat(e.target.value) || 0)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -205,10 +209,12 @@ export function ManageSeatTiersDialog({
                 />
                 
                 {error && (
-                  <p className="text-sm font-medium text-destructive">{error}</p>
+                  <div className="bg-destructive/10 p-3 rounded-md text-destructive text-sm">
+                    {error}
+                  </div>
                 )}
                 
-                <div className="flex justify-between">
+                <div className="flex justify-between pt-2">
                   {editingTier && (
                     <Button
                       type="button"
@@ -220,7 +226,7 @@ export function ManageSeatTiersDialog({
                   )}
                   <Button 
                     type="submit" 
-                    className="ml-auto"
+                    className={editingTier ? "" : "ml-auto"}
                     disabled={isCreating || isUpdating}
                   >
                     {(isCreating || isUpdating) && (
@@ -237,8 +243,8 @@ export function ManageSeatTiersDialog({
             <h3 className="text-lg font-medium mb-4">Tipos de Asiento Existentes</h3>
             
             {seatTiers && seatTiers.length > 0 ? (
-              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-                {seatTiers.map((tier) => (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {seatTiers.map((tier: SeatTier) => (
                   <Card key={tier.id} className="relative">
                     <CardHeader className="py-3">
                       <div className="flex justify-between items-start">
@@ -260,8 +266,7 @@ export function ManageSeatTiersDialog({
                         size="sm"
                         onClick={() => setEditingTier(tier)}
                       >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Editar
+                        <Edit className="h-4 w-4 mr-1" /> Editar
                       </Button>
                       <Button
                         variant="destructive"
@@ -269,19 +274,15 @@ export function ManageSeatTiersDialog({
                         onClick={() => handleDelete(tier.id)}
                         disabled={isDeleting}
                       >
-                        {isDeleting && tier.id === editingTier?.id ? (
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4 mr-1" />
-                        )}
-                        Eliminar
+                        {isDeleting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                        <Trash2 className="h-4 w-4 mr-1" /> Eliminar
                       </Button>
                     </CardFooter>
                   </Card>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-muted-foreground border rounded-md">
                 No hay tipos de asiento definidos
               </div>
             )}

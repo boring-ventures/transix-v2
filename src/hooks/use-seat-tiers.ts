@@ -71,14 +71,14 @@ export function useSeatTiers(companyId?: string, fetchInactive = false) {
       queryClient.invalidateQueries({ queryKey: ["seatTiers"] });
       toast({
         title: "Éxito",
-        description: "Categoría de asiento creada exitosamente",
+        description: "Tipo de asiento creado exitosamente",
       });
     },
     onError: (error) => {
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.error
           ? error.response.data.error
-          : "Error al crear la categoría de asiento";
+          : "Error al crear el tipo de asiento";
       
       toast({
         title: "Error",

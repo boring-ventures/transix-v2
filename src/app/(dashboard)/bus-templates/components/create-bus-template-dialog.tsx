@@ -159,32 +159,44 @@ export function CreateBusTemplateDialog({
 
       // Validate that all non-empty seats have a tier assigned
       const matrix = data.seatTemplateMatrix;
-      const unassignedSeats = [];
+      const unassignedSeats: SeatPosition[] = [];
 
+      // Only check the first floor if it exists
       if (matrix.firstFloor) {
-        unassignedSeats.push(
-          ...matrix.firstFloor.seats.filter(
-            (s: SeatPosition) => !s.isEmpty && !s.tierId
-          )
+        const firstFloorUnassigned = matrix.firstFloor.seats.filter(
+          (s: SeatPosition) => !s.isEmpty && !s.tierId
         );
+        unassignedSeats.push(...firstFloorUnassigned);
       }
 
+      // Only check the second floor if it exists
       if (matrix.secondFloor) {
-        unassignedSeats.push(
-          ...matrix.secondFloor.seats.filter(
-            (s: SeatPosition) => !s.isEmpty && !s.tierId
-          )
+        const secondFloorUnassigned = matrix.secondFloor.seats.filter(
+          (s: SeatPosition) => !s.isEmpty && !s.tierId
         );
+        unassignedSeats.push(...secondFloorUnassigned);
       }
 
       if (unassignedSeats.length > 0) {
+        console.log("Unassigned seats:", unassignedSeats);
+        
         setError(
-          "Todos los asientos deben tener un tipo asignado o marcarse como espacio vacío"
+          `Todos los asientos deben tener un tipo asignado o marcarse como espacio vacío. Asientos sin asignar: ${unassignedSeats.map(s => s.name).join(', ')}`
         );
         return;
       }
 
-      await createTemplate.mutateAsync(data as BusTemplateFormData);
+      // Prepare the data for submission
+      const submissionData = {
+        ...data,
+        // Make sure we're not sending the second floor if it doesn't exist
+        seatTemplateMatrix: {
+          firstFloor: matrix.firstFloor,
+          ...(matrix.secondFloor ? { secondFloor: matrix.secondFloor } : {})
+        }
+      };
+
+      await createTemplate.mutateAsync(submissionData as BusTemplateFormData);
       form.reset();
       onOpenChange(false);
     } catch (err) {
@@ -198,7 +210,7 @@ export function CreateBusTemplateDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Crear Plantilla de Bus</DialogTitle>
             <DialogDescription>
@@ -208,173 +220,177 @@ export function CreateBusTemplateDialog({
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="companyId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Empresa</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="companyId"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Empresa</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar empresa" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {companies?.map((company: Company) => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nombre</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar empresa" />
-                            </SelectTrigger>
+                            <Input {...field} />
                           </FormControl>
-                          <SelectContent>
-                            {companies?.map((company: Company) => (
-                              <SelectItem key={company.id} value={company.id}>
-                                {company.name}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de Bus</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar tipo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="standard">Estándar</SelectItem>
+                              <SelectItem value="luxury">Lujo</SelectItem>
+                              <SelectItem value="double_decker">
+                                Dos Pisos
                               </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                              <SelectItem value="minibus">Minibús</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descripción</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tipo de Bus</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Descripción</FormLabel>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar tipo" />
-                            </SelectTrigger>
+                            <Input {...field} />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value="standard">Estándar</SelectItem>
-                            <SelectItem value="luxury">Lujo</SelectItem>
-                            <SelectItem value="double_decker">
-                              Dos Pisos
-                            </SelectItem>
-                            <SelectItem value="minibus">Minibús</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={form.control}
-                    name="isActive"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Activo</FormLabel>
-                          <p className="text-sm text-muted-foreground">
-                            La plantilla estará disponible para asignar a buses
-                          </p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-between items-center pt-4">
-                    <h3 className="text-sm font-medium">Tipos de Asiento</h3>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowSeatTiersDialog(true)}
-                      disabled={!selectedCompanyId}
-                    >
-                      Gestionar Tipos de Asiento
-                    </Button>
+                    <FormField
+                      control={form.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 col-span-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Activo</FormLabel>
+                            <p className="text-sm text-muted-foreground">
+                              La plantilla estará disponible para asignar a buses
+                            </p>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
-                  {!selectedCompanyId && (
-                    <p className="text-sm text-muted-foreground">
-                      Seleccione una empresa para gestionar los tipos de asiento
-                    </p>
-                  )}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium">Tipos de Asiento</h3>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSeatTiersDialog(true)}
+                        disabled={!selectedCompanyId}
+                      >
+                        Gestionar Tipos de Asiento
+                      </Button>
+                    </div>
 
-                  <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2">
-                    {isLoadingSeatTiers ? (
+                    {!selectedCompanyId && (
                       <p className="text-sm text-muted-foreground">
-                        Cargando tipos de asiento...
+                        Seleccione una empresa para gestionar los tipos de asiento
                       </p>
-                    ) : seatTiers?.filter(
-                        (tier: SeatTier) => tier.companyId === selectedCompanyId
-                      ).length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No hay tipos de asiento definidos
-                      </p>
-                    ) : (
-                      seatTiers
-                        ?.filter(
-                          (tier: SeatTier) =>
-                            tier.companyId === selectedCompanyId
-                        )
-                        .map((tier: SeatTier) => (
-                          <div
-                            key={tier.id}
-                            className="flex justify-between items-center p-2 border rounded-md"
-                          >
-                            <div>
-                              <p className="font-medium">{tier.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Precio Base: ${tier.basePrice}
-                              </p>
-                            </div>
-                            <Badge
-                              variant={tier.isActive ? "outline" : "secondary"}
-                            >
-                              {tier.isActive ? "Activo" : "Inactivo"}
-                            </Badge>
-                          </div>
-                        ))
                     )}
+
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto border rounded-md p-3">
+                      {isLoadingSeatTiers ? (
+                        <p className="text-sm text-muted-foreground">
+                          Cargando tipos de asiento...
+                        </p>
+                      ) : seatTiers?.filter(
+                          (tier: SeatTier) => tier.companyId === selectedCompanyId
+                        ).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No hay tipos de asiento definidos
+                        </p>
+                      ) : (
+                        seatTiers
+                          ?.filter(
+                            (tier: SeatTier) =>
+                              tier.companyId === selectedCompanyId
+                          )
+                          .map((tier: SeatTier) => (
+                            <div
+                              key={tier.id}
+                              className="flex justify-between items-center p-3 border rounded-md"
+                            >
+                              <div>
+                                <p className="font-medium">{tier.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Precio Base: ${tier.basePrice}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={tier.isActive ? "outline" : "secondary"}
+                              >
+                                {tier.isActive ? "Activo" : "Inactivo"}
+                              </Badge>
+                            </div>
+                          ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div>
+                <div className="space-y-5">
                   <FormField
                     control={form.control}
                     name="seatTemplateMatrix"
@@ -382,7 +398,7 @@ export function CreateBusTemplateDialog({
                       <FormItem>
                         <FormLabel>Configuración de Asientos</FormLabel>
                         <FormControl>
-                          <div className="border rounded-md p-4">
+                          <div className="border rounded-md p-4 bg-background">
                             <SeatMatrixEditor
                               value={field.value}
                               onChange={handleMatrixChange}
@@ -405,7 +421,7 @@ export function CreateBusTemplateDialog({
                     control={form.control}
                     name="totalCapacity"
                     render={({ field }) => (
-                      <FormItem className="mt-4">
+                      <FormItem>
                         <FormLabel>Capacidad Total</FormLabel>
                         <FormControl>
                           <Input
