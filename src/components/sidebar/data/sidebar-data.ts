@@ -1,50 +1,37 @@
 import {
   AlertCircle,
   AppWindow,
-  AudioWaveform,
   Ban,
   BellRing,
-  Monitor,
-  Bug,
+  Bus,
   CheckSquare,
   Command,
-  GalleryVerticalEnd,
+  FileText,
   HelpCircle,
   LayoutDashboard,
-  Lock,
-  LockKeyhole,
+  Map,
+  MapPin,
   MessageSquare,
-  Palette,
   Settings,
-  ServerCrash,
-  Wrench,
-  UserCog,
-  UserX,
+  Ticket,
   Users,
+  Building,
+  CreditCard,
+  User,
 } from "lucide-react";
 import type { SidebarData } from "../types";
 
 export const sidebarData: SidebarData = {
   user: {
-    name: "satnaing",
-    email: "satnaingdev@gmail.com",
-    avatar: "/avatars/shadcn.jpg",
+    name: "admin",
+    email: "admin@transix.com",
+    avatar: "/avatars/admin.jpg",
   },
   teams: [
     {
-      name: "Shadcn Admin",
+      name: "TRANSIX",
       logo: Command,
-      plan: "Vite + ShadcnUI",
-    },
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
+      plan: "Sistema de Transporte",
     },
   ],
   navGroups: [
@@ -52,133 +39,87 @@ export const sidebarData: SidebarData = {
       title: "General",
       items: [
         {
-          title: "Dashboard",
+          title: "Panel Principal",
           url: "/",
           icon: LayoutDashboard,
         },
         {
-          title: "Tasks",
-          url: "/tasks",
-          icon: CheckSquare,
+          title: "Tickets",
+          url: "/tickets",
+          icon: Ticket,
+          items: [
+            {
+              title: "Vender Tickets",
+              url: "/tickets/sell",
+            },
+            {
+              title: "Lista de Tickets",
+              url: "/tickets/list",
+            },
+          ],
         },
         {
-          title: "Apps",
-          url: "/apps",
-          icon: AppWindow,
+          title: "Viajes",
+          url: "/trips",
+          icon: Bus,
+          items: [
+            {
+              title: "Lista de Viajes",
+              url: "/trips/list",
+            },
+          ],
         },
         {
-          title: "Chats",
-          url: "/chats",
-          badge: "3",
-          icon: MessageSquare,
+          title: "Rutas",
+          url: "/routes",
+          icon: Map,
+          items: [
+            {
+              title: "Lista de Rutas",
+              url: "/routes/list",
+            },
+          ],
         },
         {
-          title: "Users",
+          title: "Ubicaciones",
+          url: "/locations",
+          icon: MapPin,
+        },
+        {
+          title: "Buses",
+          url: "/buses",
+          icon: Bus,
+          items: [
+            {
+              title: "Lista de Buses",
+              url: "/buses/list",
+            },
+          ],
+        },
+        {
+          title: "Plantillas",
+          url: "/templates",
+          icon: FileText,
+        },
+        {
+          title: "Conductores",
+          url: "/drivers",
+          icon: User,
+        },
+        {
+          title: "Usuarios",
           url: "/users",
           icon: Users,
         },
-      ],
-    },
-    {
-      title: "Pages",
-      items: [
         {
-          title: "Auth",
-          icon: Lock,
-          items: [
-            {
-              title: "Sign In",
-              url: "/sign-in",
-            },
-            {
-              title: "Sign In (2 Col)",
-              url: "/sign-in-2",
-            },
-            {
-              title: "Sign Up",
-              url: "/sign-up",
-            },
-            {
-              title: "Forgot Password",
-              url: "/forgot-password",
-            },
-            {
-              title: "OTP",
-              url: "/otp",
-            },
-          ],
+          title: "Empresas",
+          url: "/companies",
+          icon: Building,
         },
         {
-          title: "Errors",
-          icon: Bug,
-          items: [
-            {
-              title: "Unauthorized",
-              url: "/401",
-              icon: LockKeyhole,
-            },
-            {
-              title: "Forbidden",
-              url: "/403",
-              icon: UserX,
-            },
-            {
-              title: "Not Found",
-              url: "/404",
-              icon: AlertCircle,
-            },
-            {
-              title: "Internal Server Error",
-              url: "/500",
-              icon: ServerCrash,
-            },
-            {
-              title: "Maintenance Error",
-              url: "/503",
-              icon: Ban,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      title: "Other",
-      items: [
-        {
-          title: "Settings",
-          icon: Settings,
-          items: [
-            {
-              title: "Profile",
-              url: "/settings",
-              icon: UserCog,
-            },
-            {
-              title: "Account",
-              url: "/settings/account",
-              icon: Wrench,
-            },
-            {
-              title: "Appearance",
-              url: "/settings/appearance",
-              icon: Palette,
-            },
-            {
-              title: "Notifications",
-              url: "/settings/notifications",
-              icon: BellRing,
-            },
-            {
-              title: "Display",
-              url: "/settings/display",
-              icon: Monitor,
-            },
-          ],
-        },
-        {
-          title: "Help Center",
-          url: "/help-center",
-          icon: HelpCircle,
+          title: "Finanzas",
+          url: "/finances",
+          icon: CreditCard,
         },
       ],
     },

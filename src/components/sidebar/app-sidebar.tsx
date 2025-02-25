@@ -1,6 +1,5 @@
 "use client";
 
-import { useAuth } from "@/providers/auth-provider";
 import {
   Sidebar,
   SidebarContent,
@@ -12,22 +11,10 @@ import { NavGroup } from "./nav-group";
 import { NavUser } from "./nav-user";
 import { TeamSwitcher } from "./team-switcher";
 import { sidebarData } from "./data/sidebar-data";
-import type { NavGroupProps } from "./types";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { profile } = useAuth();
-  
-  // Filter nav groups based on user role
-  const filteredNavGroups = sidebarData.navGroups.filter(group => {
-    // If no requiredRole is specified, show to everyone
-    if (!group.requiredRole) return true;
-    
-    // If user has no profile yet, only show public items
-    if (!profile) return group.public === true;
-    
-    // Check if user role matches required role
-    return group.requiredRole.includes(profile.role);
-  });
+  // No need to filter based on roles anymore
+  const navGroups = sidebarData.navGroups;
 
   return (
     <Sidebar collapsible="icon" variant="floating" {...props}>
@@ -35,8 +22,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <TeamSwitcher teams={sidebarData.teams} />
       </SidebarHeader>
       <SidebarContent>
-        {filteredNavGroups.map((props: NavGroupProps) => (
-          <NavGroup key={props.title} {...props} />
+        {navGroups.map((group) => (
+          <NavGroup key={group.title} {...group} />
         ))}
       </SidebarContent>
       <SidebarFooter>
