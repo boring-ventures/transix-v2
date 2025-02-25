@@ -72,35 +72,41 @@ export function EditSeatDialog({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="seat-type">Tipo de Asiento</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="seat-type"
-                  checked={!isEmpty}
-                  onCheckedChange={(checked) => {
-                    setIsEmpty(!checked);
-                    if (!checked) {
-                      setTierId("");
-                    }
-                  }}
-                />
-                <Label htmlFor="seat-type" className="cursor-pointer">
-                  {isEmpty ? "Espacio Vacío" : "Asiento"}
-                </Label>
-              </div>
+          <div className="flex flex-col space-y-3">
+            <Label htmlFor="seat-type" className="text-base font-medium">Tipo de Espacio</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={!isEmpty ? "default" : "outline"}
+                className={!isEmpty ? "bg-primary" : ""}
+                onClick={() => {
+                  setIsEmpty(false);
+                }}
+              >
+                Asiento
+              </Button>
+              <Button
+                type="button"
+                variant={isEmpty ? "default" : "outline"}
+                className={isEmpty ? "bg-primary" : ""}
+                onClick={() => {
+                  setIsEmpty(true);
+                  setTierId("");
+                }}
+              >
+                Espacio Vacío
+              </Button>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="seat-name">Nombre</Label>
-              <Input
-                id="seat-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full"
-              />
-            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="seat-name">Nombre</Label>
+            <Input
+              id="seat-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full"
+            />
           </div>
           
           {!isEmpty && (
@@ -109,7 +115,6 @@ export function EditSeatDialog({
               <Select
                 value={tierId}
                 onValueChange={setTierId}
-                disabled={isEmpty}
               >
                 <SelectTrigger id="tier" className="w-full">
                   <SelectValue placeholder="Seleccionar tipo" />

@@ -221,16 +221,21 @@ export function CreateBusTemplateDialog({
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Información Básica</h3>
+                    
                     <FormField
                       control={form.control}
                       name="companyId"
                       render={({ field }) => (
-                        <FormItem className="col-span-2">
+                        <FormItem>
                           <FormLabel>Empresa</FormLabel>
                           <Select
-                            onValueChange={field.onChange}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              setSelectedCompanyId(value);
+                            }}
                             value={field.value}
                           >
                             <FormControl>
@@ -251,57 +256,59 @@ export function CreateBusTemplateDialog({
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nombre</FormLabel>
-                          <FormControl>
-                            <Input {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tipo de Bus</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                          >
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nombre</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar tipo" />
-                              </SelectTrigger>
+                              <Input {...field} placeholder="Nombre de la plantilla" />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="standard">Estándar</SelectItem>
-                              <SelectItem value="luxury">Lujo</SelectItem>
-                              <SelectItem value="double_decker">
-                                Dos Pisos
-                              </SelectItem>
-                              <SelectItem value="minibus">Minibús</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tipo de Bus</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Seleccionar tipo" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="standard">Estándar</SelectItem>
+                                <SelectItem value="luxury">Lujo</SelectItem>
+                                <SelectItem value="double_decker">
+                                  Dos Pisos
+                                </SelectItem>
+                                <SelectItem value="minibus">Minibús</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
                     <FormField
                       control={form.control}
                       name="description"
                       render={({ field }) => (
-                        <FormItem className="col-span-2">
+                        <FormItem>
                           <FormLabel>Descripción</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} placeholder="Descripción opcional de la plantilla" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -312,7 +319,7 @@ export function CreateBusTemplateDialog({
                       control={form.control}
                       name="isActive"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 col-span-2">
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                           <FormControl>
                             <Checkbox
                               checked={field.value}
@@ -322,15 +329,38 @@ export function CreateBusTemplateDialog({
                           <div className="space-y-1 leading-none">
                             <FormLabel>Activo</FormLabel>
                             <p className="text-sm text-muted-foreground">
-                              La plantilla estará disponible para asignar a buses
+                              Disponible para buses
                             </p>
                           </div>
                         </FormItem>
                       )}
                     />
+                    
+                    <FormField
+                      control={form.control}
+                      name="totalCapacity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Capacidad Total</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(
+                                  Number.parseInt(e.target.value) || 0
+                                )
+                              }
+                              disabled
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4 pt-2">
                     <div className="flex justify-between items-center">
                       <h3 className="text-lg font-medium">Tipos de Asiento</h3>
                       <Button
@@ -340,7 +370,7 @@ export function CreateBusTemplateDialog({
                         onClick={() => setShowSeatTiersDialog(true)}
                         disabled={!selectedCompanyId}
                       >
-                        Gestionar Tipos de Asiento
+                        Gestionar Tipos
                       </Button>
                     </div>
 
@@ -390,13 +420,13 @@ export function CreateBusTemplateDialog({
                   </div>
                 </div>
 
-                <div className="space-y-5">
+                <div>
                   <FormField
                     control={form.control}
                     name="seatTemplateMatrix"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Configuración de Asientos</FormLabel>
+                        <FormLabel className="text-lg font-medium">Configuración de Asientos</FormLabel>
                         <FormControl>
                           <div className="border rounded-md p-4 bg-background">
                             <SeatMatrixEditor
@@ -411,29 +441,6 @@ export function CreateBusTemplateDialog({
                               companyId={selectedCompanyId}
                             />
                           </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="totalCapacity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Capacidad Total</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(
-                                Number.parseInt(e.target.value) || 0
-                              )
-                            }
-                            disabled
-                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
