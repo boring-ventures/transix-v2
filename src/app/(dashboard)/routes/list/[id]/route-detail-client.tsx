@@ -15,9 +15,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EditRouteDialog } from "../../components/edit-route-dialog";
 import { DeleteRouteDialog } from "../../components/delete-route-dialog";
+import { RouteSchedules } from "../../components/route-schedules";
 import { AlertCircle, ArrowLeft, Edit, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RouteScheduleList } from "../../components/route-schedule-list";
 
 interface RouteDetailClientProps {
   id: string;
@@ -151,8 +153,12 @@ export default function RouteDetailClient({ id }: RouteDetailClientProps) {
               size="sm"
               onClick={handleDeactivate}
               disabled={
-                isDeactivating || 
-                !!(stats && (stats.activeAssignmentsCount > 0 || stats.activeRouteSchedulesCount > 0))
+                isDeactivating ||
+                !!(
+                  stats &&
+                  (stats.activeAssignmentsCount > 0 ||
+                    stats.activeRouteSchedulesCount > 0)
+                )
               }
             >
               Desactivar
@@ -163,7 +169,12 @@ export default function RouteDetailClient({ id }: RouteDetailClientProps) {
             variant="destructive"
             size="sm"
             onClick={() => setShowDeleteDialog(true)}
-            disabled={!!(stats && (stats.assignmentsCount > 0 || stats.routeSchedulesCount > 0))}
+            disabled={
+              !!(
+                stats &&
+                (stats.assignmentsCount > 0 || stats.routeSchedulesCount > 0)
+              )
+            }
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Eliminar
@@ -191,28 +202,36 @@ export default function RouteDetailClient({ id }: RouteDetailClientProps) {
                 <p className="text-sm font-medium text-muted-foreground">
                   Origen
                 </p>
-                <p className="text-lg font-medium">{route.origin?.name || "-"}</p>
+                <p className="text-lg font-medium">
+                  {route.origin?.name || "-"}
+                </p>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
                   Destino
                 </p>
-                <p className="text-lg font-medium">{route.destination?.name || "-"}</p>
+                <p className="text-lg font-medium">
+                  {route.destination?.name || "-"}
+                </p>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
                   Duración Estimada
                 </p>
-                <p className="text-lg font-medium">{route.estimatedDuration} minutos</p>
+                <p className="text-lg font-medium">
+                  {route.estimatedDuration} minutos
+                </p>
               </div>
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
                   Carril de Salida
                 </p>
-                <p className="text-lg font-medium">{route.departureLane || "-"}</p>
+                <p className="text-lg font-medium">
+                  {route.departureLane || "-"}
+                </p>
               </div>
 
               <div>
@@ -275,6 +294,7 @@ export default function RouteDetailClient({ id }: RouteDetailClientProps) {
       <Tabs defaultValue="schedules" className="mt-6">
         <TabsList>
           <TabsTrigger value="schedules">Horarios</TabsTrigger>
+          <TabsTrigger value="trips">Viajes</TabsTrigger>
           <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
         </TabsList>
 
@@ -287,15 +307,21 @@ export default function RouteDetailClient({ id }: RouteDetailClientProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {stats?.routeSchedulesCount === 0 ? (
-                <p className="text-muted-foreground">
-                  No hay horarios programados para esta ruta
-                </p>
-              ) : (
-                <p className="text-muted-foreground">
-                  Implementación de lista de horarios pendiente
-                </p>
-              )}
+              <RouteScheduleList routeId={id} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="trips" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Viajes Programados</CardTitle>
+              <CardDescription>
+                Viajes programados para esta ruta
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RouteSchedules routeId={id} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -304,9 +330,7 @@ export default function RouteDetailClient({ id }: RouteDetailClientProps) {
           <Card>
             <CardHeader>
               <CardTitle>Asignaciones de Buses</CardTitle>
-              <CardDescription>
-                Buses asignados a esta ruta
-              </CardDescription>
+              <CardDescription>Buses asignados a esta ruta</CardDescription>
             </CardHeader>
             <CardContent>
               {stats?.assignmentsCount === 0 ? (
