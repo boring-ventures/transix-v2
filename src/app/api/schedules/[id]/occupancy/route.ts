@@ -46,7 +46,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { passengerCount, recordedAt, notes } = await request.json();
+    const { passengerCount, recordedAt } = await request.json();
 
     // Validate required fields
     if (passengerCount === undefined) {
@@ -72,9 +72,8 @@ export async function POST(
     const occupancyLog = await prisma.occupancyLog.create({
       data: {
         scheduleId: id,
-        passengerCount,
-        recordedAt: recordedAt ? new Date(recordedAt) : new Date(),
-        notes,
+        occupiedSeats: passengerCount,
+        recordedAt: recordedAt ? new Date(recordedAt) : new Date()
       },
     });
 

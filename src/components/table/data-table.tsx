@@ -218,7 +218,8 @@ export function DataTable<TData>({
                           column.sortable ? "cursor-pointer select-none" : ""
                         }
                         onClick={() =>
-                          column.sortable && handleSort(column.accessorKey)
+                          column.sortable &&
+                          handleSort(column.accessorKey as keyof TData)
                         }
                       >
                         <div className="flex items-center space-x-2">
@@ -264,8 +265,8 @@ export function DataTable<TData>({
                       {columns.map((column) => (
                         <TableCell key={column.id}>
                           {column.cell
-                            ? column.cell({ row })
-                            : String(row[column.accessorKey])}
+                            ? (column.cell({ row }) as React.ReactNode)
+                            : String(row[column.accessorKey as keyof TData])}
                         </TableCell>
                       ))}
                       {(onEdit || onDelete || customActions) && (

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, MaintenanceStatus } from "@prisma/client";
 
 // Get all buses with optional filtering
 export async function GET(req: Request) {
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     if (companyId) query.companyId = companyId;
     if (isActive !== undefined) query.isActive = isActive;
     if (templateId) query.templateId = templateId;
-    if (maintenanceStatus) query.maintenanceStatus = maintenanceStatus as Prisma.MaintenanceStatus;
+    if (maintenanceStatus) query.maintenanceStatus = maintenanceStatus as MaintenanceStatus;
     
     // Fetch buses
     const buses = await prisma.bus.findMany({

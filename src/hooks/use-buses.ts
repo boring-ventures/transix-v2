@@ -36,12 +36,11 @@ export type BusFormData = {
   maintenanceStatus?: MaintenanceStatus;
 };
 
-export function useBuses(
-  companyId?: string,
-  fetchInactive = false,
-  templateId?: string
-) {
+export function useBuses(isActive?: boolean) {
   const queryClient = useQueryClient();
+
+  // Inside the hook, convert the boolean to a string for the API call
+  const activeParam = isActive !== undefined ? isActive.toString() : undefined;
 
   // Fetch all buses (optionally filtered by company and template)
   const {
@@ -50,14 +49,12 @@ export function useBuses(
     error: busesError,
     refetch: refetchBuses,
   } = useQuery({
-    queryKey: ["buses", { companyId, fetchInactive, templateId }],
+    queryKey: ["buses", { activeParam }],
     queryFn: async () => {
       let url = "/api/buses";
       const params = new URLSearchParams();
 
-      if (companyId) params.append("companyId", companyId);
-      if (!fetchInactive) params.append("isActive", "true");
-      if (templateId) params.append("templateId", templateId);
+      if (activeParam) params.append("isActive", activeParam);
 
       if (params.toString()) {
         url += `?${params.toString()}`;
@@ -66,7 +63,7 @@ export function useBuses(
       const response = await axios.get(url);
       return response.data.buses;
     },
-    enabled: !!companyId || companyId === undefined, // Only fetch if companyId is provided or explicitly undefined
+    enabled: !!activeParam || activeParam === undefined, // Only fetch if activeParam is provided or explicitly undefined
   });
 
   // Fetch a single bus by ID

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { PassengerStatus } from "@prisma/client";
 
 // Get passenger list for a schedule
 export async function GET(
@@ -26,7 +27,7 @@ export async function GET(
     // Build where clause
     const whereClause = {
       scheduleId: id,
-      ...(status ? { status } : {}),
+      ...(status ? { status: status as PassengerStatus } : {}),
     };
 
     // Get passenger list
@@ -89,7 +90,7 @@ export async function POST(
       documentId: ticket.customer?.documentId || null,
       fullName: ticket.customer?.fullName || "Unknown",
       seatNumber: ticket.busSeat.seatNumber,
-      status: "confirmed",
+      status: "confirmed" as PassengerStatus,
     }));
 
     // Create passenger list entries

@@ -42,7 +42,10 @@ export function BusesTable({
       id: "template",
       header: "Plantilla",
       accessorFn: (row) => row.template?.name || "Sin plantilla",
-      cell: ({ getValue }) => <div>{getValue?.() || "Sin plantilla"}</div>,
+      cell: ({ getValue }) => {
+        const value = getValue?.() as string | undefined;
+        return <div>{value || "Sin plantilla"}</div>;
+      },
     },
     {
       id: "seats",

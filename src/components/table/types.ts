@@ -1,14 +1,20 @@
 export type SortDirection = 'asc' | 'desc' | undefined
 
 export interface Column<T> {
-  id: string
-  header: string
-  accessorKey?: keyof T | string
-  accessorFn?: (row: T) => any
-  cell?: ({ row, getValue }: { row: T; getValue?: () => any }) => React.ReactNode
-  enableSorting?: boolean
-  enableHiding?: boolean
-  sortable?: boolean
+  id: string;
+  header: string;
+  accessorKey?: keyof T | string;
+  accessorFn?: (row: T) => unknown;
+  cell?: ({
+    row,
+    getValue,
+  }: {
+    row: T;
+    getValue?: () => unknown;
+  }) => React.ReactNode | string | number | null | undefined;
+  enableSorting?: boolean;
+  enableHiding?: boolean;
+  sortable?: boolean;
 }
 
 export interface TableProps<T> {

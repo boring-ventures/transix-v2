@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { ParcelStatus } from "@prisma/client";
 
 // Get all parcels for a schedule
 export async function GET(
@@ -26,7 +27,7 @@ export async function GET(
     // Build where clause
     const whereClause = {
       scheduleId: id,
-      ...(status ? { status } : {}),
+      ...(status ? { status: status as ParcelStatus } : {}),
     };
 
     // Get parcels
@@ -66,7 +67,6 @@ export async function POST(
     const { id } = await params;
     const {
       trackingNumber,
-      description,
       weight,
       dimensions,
       senderId,
@@ -103,8 +103,8 @@ export async function POST(
     }
 
     // Check if tracking number is unique
-    const existingParcel = await prisma.parcel.findUnique({
-      where: { trackingNumber },
+    const existingParcel = await prisma.parcel.findFirst({
+      where: { id: trackingNumber },
     });
 
     if (existingParcel) {
@@ -118,14 +118,13 @@ export async function POST(
     const parcel = await prisma.parcel.create({
       data: {
         scheduleId: id,
-        trackingNumber,
-        description,
         weight,
         dimensions,
         senderId,
         receiverId,
         price: price || 0,
         status: status || "received",
+        declaredValue: 0,
       },
       include: {
         sender: true,
@@ -152,7 +151,6 @@ export async function POST(
       data: {
         parcelId: parcel.id,
         status: parcel.status,
-        notes: "Parcel received at origin",
       },
     });
 

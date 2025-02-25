@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { TicketStatus } from "@prisma/client";
 
 // Get all tickets for a schedule
 export async function GET(
@@ -26,7 +27,7 @@ export async function GET(
     // Build where clause
     const whereClause = {
       scheduleId: id,
-      ...(status ? { status } : {}),
+      ...(status ? { status: status as TicketStatus } : {}),
     };
 
     // Get tickets

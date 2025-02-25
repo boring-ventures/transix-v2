@@ -54,8 +54,11 @@ export type DriverFormData = {
   active?: boolean;
 };
 
-export function useDrivers(fetchInactive = false) {
+export function useDrivers(active?: boolean) {
   const queryClient = useQueryClient();
+
+  // Inside the hook, convert the boolean to a string for the API call
+  const activeParam = active !== undefined ? active.toString() : undefined;
 
   // Fetch all drivers (active by default)
   const {
@@ -64,10 +67,10 @@ export function useDrivers(fetchInactive = false) {
     error: driversError,
     refetch: refetchDrivers,
   } = useQuery({
-    queryKey: ["drivers", { fetchInactive }],
+    queryKey: ["drivers", { active: activeParam }],
     queryFn: async () => {
       const response = await axios.get(
-        `/api/drivers${fetchInactive ? "?includeInactive=true" : "?active=true"}`
+        `/api/drivers${activeParam ? `?active=${activeParam}` : "?active=true"}`
       );
       return response.data.drivers;
     },

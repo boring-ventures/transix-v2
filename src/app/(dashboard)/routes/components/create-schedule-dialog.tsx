@@ -5,8 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSchedules, type ScheduleFormData } from "@/hooks/use-schedules";
-import { useBuses } from "@/hooks/use-buses";
-import { useDrivers } from "@/hooks/use-drivers";
+import { type Bus, useBuses } from "@/hooks/use-buses";
+import { type Driver, useDrivers } from "@/hooks/use-drivers";
 import { useRouteSchedules, type RouteSchedule } from "@/hooks/use-route-schedules";
 import {
   Dialog,
@@ -72,13 +72,12 @@ export function CreateScheduleDialog({
   routeId,
 }: CreateScheduleDialogProps) {
   const { createSchedule, isCreating } = useSchedules();
-  const { buses, isLoadingBuses } = useBuses({ isActive: true });
-  const { drivers, isLoadingDrivers } = useDrivers({ active: true });
+  const { buses, isLoadingBuses } = useBuses(true);
+  const { drivers, isLoadingDrivers } = useDrivers(true);
   const { routeSchedules, isLoadingRouteSchedules } = useRouteSchedules({
     routeId,
   });
   const [error, setError] = useState<string | null>(null);
-  const [selectedRouteSchedule, setSelectedRouteSchedule] = useState<RouteSchedule | null>(null);
 
   const form = useForm<CreateScheduleFormValues>({
     resolver: zodResolver(formSchema),
@@ -108,21 +107,19 @@ export function CreateScheduleDialog({
   useEffect(() => {
     const routeScheduleId = form.watch("routeScheduleId");
     const departureDate = form.watch("departureDate");
-    
+
     if (routeScheduleId && departureDate) {
       const routeSchedule = routeSchedules.find(
-        (rs) => rs.id === routeScheduleId
+        (rs: RouteSchedule) => rs.id === routeScheduleId
       );
-      
+
       if (routeSchedule?.route) {
-        setSelectedRouteSchedule(routeSchedule);
-        
         // Calculate estimated arrival time based on departure time and route duration
         const estimatedArrivalTime = addMinutes(
           departureDate,
           routeSchedule.route.estimatedDuration
         );
-        
+
         form.setValue("estimatedArrivalTime", estimatedArrivalTime);
       }
     }
@@ -137,16 +134,19 @@ export function CreateScheduleDialog({
         busId: data.busId,
         routeScheduleId: data.routeScheduleId,
         primaryDriverId: data.primaryDriverId,
-        secondaryDriverId: data.secondaryDriverId === 'none' ? undefined : data.secondaryDriverId,
+        secondaryDriverId:
+          data.secondaryDriverId === "none"
+            ? undefined
+            : data.secondaryDriverId,
         departureDate: data.departureDate.toISOString(),
         estimatedArrivalTime: data.estimatedArrivalTime.toISOString(),
         price: data.price,
       };
-      
+
       await createSchedule.mutateAsync(scheduleData);
       form.reset();
       onOpenChange(false);
-    } catch (err) {
+    } catch {
       setError("Error al crear el viaje. Por favor, inténtelo de nuevo.");
     }
   };
@@ -180,11 +180,16 @@ export function CreateScheduleDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="">Ninguno</SelectItem>
-                      {routeSchedules.map((routeSchedule) => (
-                        <SelectItem key={routeSchedule.id} value={routeSchedule.id}>
+                      {routeSchedules.map((routeSchedule: RouteSchedule) => (
+                        <SelectItem
+                          key={routeSchedule.id}
+                          value={routeSchedule.id}
+                        >
                           {`${format(new Date(routeSchedule.departureTime), "HH:mm")} - ${
                             ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][
-                              routeSchedule.dayOfWeek
+                              Number.parseInt(
+                                routeSchedule.operatingDays.split(",")[0]
+                              )
                             ]
                           }`}
                         </SelectItem>
@@ -236,12 +241,11 @@ export function CreateScheduleDialog({
                           <Input
                             type="time"
                             value={
-                              field.value
-                                ? format(field.value, "HH:mm")
-                                : ""
+                              field.value ? format(field.value, "HH:mm") : ""
                             }
                             onChange={(e) => {
-                              const [hours, minutes] = e.target.value.split(":");
+                              const [hours, minutes] =
+                                e.target.value.split(":");
                               const newDate = new Date(
                                 field.value || new Date()
                               );
@@ -302,12 +306,11 @@ export function CreateScheduleDialog({
                           <Input
                             type="time"
                             value={
-                              field.value
-                                ? format(field.value, "HH:mm")
-                                : ""
+                              field.value ? format(field.value, "HH:mm") : ""
                             }
                             onChange={(e) => {
-                              const [hours, minutes] = e.target.value.split(":");
+                              const [hours, minutes] =
+                                e.target.value.split(":");
                               const newDate = new Date(
                                 field.value || new Date()
                               );
@@ -345,7 +348,7 @@ export function CreateScheduleDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {buses.map((bus) => (
+                        {buses.map((bus: Bus) => (
                           <SelectItem key={bus.id} value={bus.id}>
                             {bus.plateNumber} - {bus.template?.name || ""}
                           </SelectItem>
@@ -396,7 +399,7 @@ export function CreateScheduleDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {drivers.map((driver) => (
+                        {drivers.map((driver: Driver) => (
                           <SelectItem key={driver.id} value={driver.id}>
                             {driver.fullName}
                           </SelectItem>
@@ -428,10 +431,10 @@ export function CreateScheduleDialog({
                         <SelectItem value="none">Ninguno</SelectItem>
                         {drivers
                           .filter(
-                            (driver) =>
+                            (driver: Driver) =>
                               driver.id !== form.watch("primaryDriverId")
                           )
-                          .map((driver) => (
+                          .map((driver: Driver) => (
                             <SelectItem key={driver.id} value={driver.id}>
                               {driver.fullName}
                             </SelectItem>
