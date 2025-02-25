@@ -58,8 +58,8 @@ export function useBusSeats(busId?: string) {
     queryFn: async () => {
       if (!busId) return [];
       
-      const response = await axios.get(`/api/bus-seats?busId=${busId}`);
-      return response.data.busSeats;
+      const response = await axios.get(`/api/buses/${busId}/seats`);
+      return response.data.seats;
     },
     enabled: !!busId,
   });
@@ -212,6 +212,34 @@ export function useBusSeats(busId?: string) {
     },
   });
 
+  // Create or update all seats for a bus
+  const updateBusSeats = useMutation({
+    mutationFn: async (data: BulkSeatCreate) => {
+      const response = await axios.post(`/api/buses/${data.busId}/seats`, { seats: data.seats });
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["busSeats", variables.busId] });
+      queryClient.invalidateQueries({ queryKey: ["buses"] });
+      toast({
+        title: "Éxito",
+        description: "Asientos actualizados exitosamente",
+      });
+    },
+    onError: (error) => {
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.error
+          ? error.response.data.error
+          : "Error al actualizar los asientos";
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     seats,
     isLoadingSeats,
@@ -223,10 +251,12 @@ export function useBusSeats(busId?: string) {
     deleteSeat,
     bulkCreateSeats,
     bulkUpdateSeats,
+    updateBusSeats,
     isCreating: createSeat.isPending,
     isUpdating: updateSeat.isPending,
     isDeleting: deleteSeat.isPending,
     isBulkCreating: bulkCreateSeats.isPending,
     isBulkUpdating: bulkUpdateSeats.isPending,
+    isUpdatingSeats: updateBusSeats.isPending,
   };
 } 

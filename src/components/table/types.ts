@@ -3,9 +3,12 @@ export type SortDirection = 'asc' | 'desc' | undefined
 export interface Column<T> {
   id: string
   header: string
-  accessorKey: keyof T
+  accessorKey?: keyof T | string
+  accessorFn?: (row: T) => any
+  cell?: ({ row, getValue }: { row: T; getValue?: () => any }) => React.ReactNode
+  enableSorting?: boolean
+  enableHiding?: boolean
   sortable?: boolean
-  cell?: (props: { row: T }) => React.ReactNode
 }
 
 export interface TableProps<T> {

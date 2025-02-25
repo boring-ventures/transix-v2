@@ -1,0 +1,124 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/table/data-table";
+import { DeleteBusDialog } from "./delete-bus-dialog";
+import type { Column } from "@/components/table/types";
+import type { Bus } from "@/hooks/use-buses";
+
+interface BusesTableProps {
+  data: Bus[];
+  title: string;
+  description: string;
+  onAdd: () => void;
+}
+
+export function BusesTable({
+  data,
+  title,
+  description,
+  onAdd,
+}: BusesTableProps) {
+  const router = useRouter();
+  const [busToDelete, setBusToDelete] = useState<string | null>(null);
+
+  const columns: Column<Bus>[] = [
+    {
+      id: "plateNumber",
+      header: "Placa",
+      accessorKey: "plateNumber",
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.plateNumber}</div>
+          <div className="text-sm text-muted-foreground">
+            {row.company?.name || "Sin empresa"}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "template",
+      header: "Plantilla",
+      accessorFn: (row) => row.template?.name || "Sin plantilla",
+      cell: ({ getValue }) => <div>{getValue?.() || "Sin plantilla"}</div>,
+    },
+    {
+      id: "seats",
+      header: "Asientos",
+      accessorKey: "_count.busSeats",
+      cell: ({ row }) => (
+        <div className="text-center">{row._count?.busSeats || 0}</div>
+      ),
+    },
+    {
+      id: "maintenanceStatus",
+      header: "Estado",
+      accessorKey: "maintenanceStatus",
+      cell: ({ row }) => {
+        const status = row.maintenanceStatus;
+        return (
+          <Badge
+            variant={
+              status === "active"
+                ? "default"
+                : status === "in_maintenance"
+                  ? "outline"
+                  : "secondary"
+            }
+          >
+            {status === "active" && "Operativo"}
+            {status === "in_maintenance" && "En Mantenimiento"}
+            {status === "retired" && "Retirado"}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "isActive",
+      header: "Activo",
+      accessorKey: "isActive",
+      cell: ({ row }) => {
+        const isActive = row.isActive;
+        return (
+          <Badge variant={isActive ? "outline" : "secondary"}>
+            {isActive ? "Activo" : "Inactivo"}
+          </Badge>
+        );
+      },
+    },
+  ];
+
+  return (
+    <>
+      <DataTable
+        title={title}
+        description={description}
+        data={data}
+        columns={columns}
+        searchable={true}
+        searchField="plateNumber"
+        rowSelection={false}
+        onRowClick={(row) => router.push(`/buses/${row.id}`)}
+        onAdd={onAdd}
+        onDelete={(row) => setBusToDelete(row.id)}
+        customActions={[
+          {
+            label: "Ver",
+            onClick: (row) => router.push(`/buses/${row.id}`),
+          },
+          {
+            label: "Editar",
+            onClick: (row) => router.push(`/buses/${row.id}/edit`),
+          },
+        ]}
+      />
+
+      <DeleteBusDialog
+        busId={busToDelete}
+        onClose={() => setBusToDelete(null)}
+      />
+    </>
+  );
+}
