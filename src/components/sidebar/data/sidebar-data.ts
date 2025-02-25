@@ -100,7 +100,7 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Plantillas",
-          url: "/templates",
+          url: "/bus-templates",
           icon: FileSpreadsheet,
         },
         {
