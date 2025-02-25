@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useProfiles, type Profile, type ProfileFormData } from "@/hooks/use-profiles";
+import { useCompanies, type Company, type Branch } from "@/hooks/use-companies";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,8 @@ const formSchema = z.object({
   email: z.string().email("Email inválido").optional(),
   role: z.enum(["superadmin", "company_admin", "branch_admin", "seller"]),
   active: z.boolean().default(true),
+  companyId: z.string().optional(),
+  branchId: z.string().optional(),
 });
 
 type EditProfileFormValues = z.infer<typeof formSchema>;
@@ -53,8 +56,11 @@ export function EditProfileDialog({
   onOpenChange,
   profile,
 }: EditProfileDialogProps) {
-  const { updateProfile, isUpdating } = useProfiles();
+  const { updateProfile, isUpdating, assignCompany, isAssigningCompany } = useProfiles();
+  const { companies, isLoadingCompanies } = useCompanies();
   const [error, setError] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   const form = useForm<EditProfileFormValues>({
     resolver: zodResolver(formSchema),
@@ -63,8 +69,14 @@ export function EditProfileDialog({
       email: "",
       role: "seller",
       active: true,
+      companyId: "",
+      branchId: "",
     },
   });
+
+  // Watch for role changes to conditionally show company fields
+  const role = form.watch("role");
+  const isSuperAdmin = role === "superadmin";
 
   // Update form values when profile changes
   useEffect(() => {
@@ -74,19 +86,72 @@ export function EditProfileDialog({
         email: profile.email || "",
         role: profile.role,
         active: profile.active,
+        companyId: profile.companyId || "",
+        branchId: profile.branchId || "",
       });
+
+      if (profile.companyId) {
+        const company = companies.find((c: Company) => c.id === profile.companyId);
+        if (company) {
+          setSelectedCompany(company);
+        }
+      }
     }
-  }, [profile, form]);
+  }, [profile, form, companies]);
+
+  // Update branches when company changes
+  const handleCompanyChange = (companyId: string) => {
+    const company = companies.find((c: Company) => c.id === companyId);
+    setSelectedCompany(company || null);
+    form.setValue("branchId", "");
+  };
+
+  // Update branches when company changes
+  useEffect(() => {
+    if (selectedCompany?.branches) {
+      setBranches(selectedCompany.branches);
+    } else {
+      setBranches([]);
+    }
+  }, [selectedCompany]);
 
   const onSubmit = async (data: EditProfileFormValues) => {
     if (!profile) return;
     
     setError(null);
     try {
+      // First update the profile basic info
       await updateProfile.mutateAsync({
         id: profile.userId,
-        data: data as ProfileFormData,
+        data: {
+          fullName: data.fullName,
+          email: data.email,
+          role: data.role,
+          active: data.active,
+        } as ProfileFormData,
       });
+      
+      // Then update company assignment if needed (and not superadmin)
+      if (!isSuperAdmin) {
+        // Only call assignCompany if the company or branch has changed
+        if (data.companyId !== profile.companyId || data.branchId !== profile.branchId) {
+          await assignCompany.mutateAsync({
+            id: profile.userId,
+            companyId: data.companyId || undefined,
+            branchId: data.branchId || undefined,
+            role: data.role,
+          });
+        }
+      } else if (profile.companyId) {
+        // If user is now a superadmin but had a company before, remove company assignment
+        await assignCompany.mutateAsync({
+          id: profile.userId,
+          companyId: undefined,
+          branchId: undefined,
+          role: data.role,
+        });
+      }
+      
       onOpenChange(false);
     } catch {
       setError("Error al actualizar el usuario. Por favor, inténtelo de nuevo.");
@@ -168,6 +233,83 @@ export function EditProfileDialog({
               )}
             />
 
+            {/* Only show company and branch fields for non-superadmin roles */}
+            {!isSuperAdmin && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="companyId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Empresa</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          handleCompanyChange(value);
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar empresa" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {isLoadingCompanies ? (
+                            <SelectItem value="loading" disabled>
+                              Cargando empresas...
+                            </SelectItem>
+                          ) : (
+                            companies.map((company: Company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="branchId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sucursal</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={!selectedCompany || branches.length === 0}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar sucursal" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {branches.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No hay sucursales disponibles
+                            </SelectItem>
+                          ) : (
+                            branches.map((branch) => (
+                              <SelectItem key={branch.id} value={branch.id}>
+                                {branch.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+
             <FormField
               control={form.control}
               name="active"
@@ -198,12 +340,12 @@ export function EditProfileDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={isUpdating}
+                disabled={isUpdating || isAssigningCompany}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isUpdating}>
-                {isUpdating && (
+              <Button type="submit" disabled={isUpdating || isAssigningCompany}>
+                {(isUpdating || isAssigningCompany) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Guardar Cambios

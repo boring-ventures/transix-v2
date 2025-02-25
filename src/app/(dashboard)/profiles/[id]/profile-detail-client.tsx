@@ -18,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EditProfileDialog } from "../components/edit-profile-dialog";
-import { AssignCompanyDialog } from "../components/assign-company-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ProfileDetailClientProps {
@@ -31,7 +30,6 @@ export default function ProfileDetailClient({ id }: ProfileDetailClientProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showAssignDialog, setShowAssignDialog] = useState(false);
 
   useEffect(() => {
     const loadProfileData = async () => {
@@ -87,14 +85,7 @@ export default function ProfileDetailClient({ id }: ProfileDetailClientProps) {
                 {profile.email}
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowAssignDialog(true)}
-              >
-                <Building className="mr-2 h-4 w-4" />
-                Asignar Empresa
-              </Button>
+            <div>
               <Button onClick={() => setShowEditDialog(true)}>
                 Editar Usuario
               </Button>
@@ -230,7 +221,7 @@ export default function ProfileDetailClient({ id }: ProfileDetailClientProps) {
                       <Button 
                         variant="outline" 
                         className="mt-4"
-                        onClick={() => setShowAssignDialog(true)}
+                        onClick={() => setShowEditDialog(true)}
                       >
                         Asignar Empresa
                       </Button>
@@ -244,12 +235,6 @@ export default function ProfileDetailClient({ id }: ProfileDetailClientProps) {
           <EditProfileDialog
             open={showEditDialog}
             onOpenChange={setShowEditDialog}
-            profile={profile}
-          />
-
-          <AssignCompanyDialog
-            open={showAssignDialog}
-            onOpenChange={setShowAssignDialog}
             profile={profile}
           />
         </>

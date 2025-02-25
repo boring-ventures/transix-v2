@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useProfiles } from "@/hooks/use-profiles";
 import { useAuth } from "@/hooks/use-auth";
+import { useCompanies, type Company, type Branch } from "@/hooks/use-companies";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,8 @@ const formSchema = z.object({
   fullName: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   role: z.enum(["superadmin", "company_admin", "branch_admin", "seller"]),
   active: z.boolean().default(true),
+  companyId: z.string().optional(),
+  branchId: z.string().optional(),
 });
 
 type CreateProfileFormValues = z.infer<typeof formSchema>;
@@ -55,7 +58,10 @@ export function CreateProfileDialog({
 }: CreateProfileDialogProps) {
   const { signUp } = useAuth();
   const { createProfile, isCreating } = useProfiles();
+  const { companies, isLoadingCompanies } = useCompanies();
   const [error, setError] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
   const form = useForm<CreateProfileFormValues>({
     resolver: zodResolver(formSchema),
@@ -65,13 +71,37 @@ export function CreateProfileDialog({
       fullName: "",
       role: "seller",
       active: true,
+      companyId: "",
+      branchId: "",
     },
   });
 
+  const role = form.watch("role");
+  const isSuperAdmin = role === "superadmin";
+
+  const handleCompanyChange = (companyId: string) => {
+    const company = companies.find((c: Company) => c.id === companyId);
+    setSelectedCompany(company || null);
+    form.setValue("branchId", "");
+  };
+
+  useEffect(() => {
+    if (selectedCompany?.branches) {
+      setBranches(selectedCompany.branches);
+    } else {
+      setBranches([]);
+    }
+  }, [selectedCompany]);
+
   const onSubmit = async (data: CreateProfileFormValues) => {
     setError(null);
+    
+    if (!isSuperAdmin && !data.companyId) {
+      setError("Debe seleccionar una empresa para este rol");
+      return;
+    }
+    
     try {
-      // First, create the user in Supabase
       const { success, user, error: signUpError } = await signUp(data.email, data.password);
       
       if (!success || !user) {
@@ -79,13 +109,14 @@ export function CreateProfileDialog({
         return;
       }
       
-      // Then create the profile
       await createProfile.mutateAsync({
         userId: user.id,
         fullName: data.fullName,
         email: data.email,
         role: data.role,
         active: data.active,
+        companyId: isSuperAdmin ? undefined : data.companyId,
+        branchId: isSuperAdmin ? undefined : data.branchId,
       });
       
       form.reset();
@@ -186,6 +217,82 @@ export function CreateProfileDialog({
                 </FormItem>
               )}
             />
+
+            {!isSuperAdmin && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="companyId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Empresa</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          handleCompanyChange(value);
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar empresa" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {isLoadingCompanies ? (
+                            <SelectItem value="loading" disabled>
+                              Cargando empresas...
+                            </SelectItem>
+                          ) : (
+                            companies.map((company: Company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="branchId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sucursal</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={!selectedCompany || branches.length === 0}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar sucursal" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {branches.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No hay sucursales disponibles
+                            </SelectItem>
+                          ) : (
+                            branches.map((branch) => (
+                              <SelectItem key={branch.id} value={branch.id}>
+                                {branch.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
 
             <FormField
               control={form.control}

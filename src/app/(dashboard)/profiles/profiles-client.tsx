@@ -10,7 +10,6 @@ import { LoadingTable } from "@/components/table/loading-table";
 import { CreateProfileDialog } from "./components/create-profile-dialog";
 import { EditProfileDialog } from "./components/edit-profile-dialog";
 import { DeleteProfileDialog } from "./components/delete-profile-dialog";
-import { AssignCompanyDialog } from "./components/assign-company-dialog";
 import type { Column } from "@/components/table/types";
 
 export default function ProfilesClient() {
@@ -19,7 +18,6 @@ export default function ProfilesClient() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [profileToEdit, setProfileToEdit] = useState<Profile | null>(null);
   const [profileToDelete, setProfileToDelete] = useState<string | null>(null);
-  const [profileToAssign, setProfileToAssign] = useState<Profile | null>(null);
 
   const handleViewProfile = (profile: Profile) => {
     router.push(`/profiles/${profile.userId}`);
@@ -81,13 +79,6 @@ export default function ProfilesClient() {
     },
   ];
 
-  const actions = [
-    {
-      label: "Asignar Empresa",
-      onClick: (profile: Profile) => setProfileToAssign(profile),
-    },
-  ];
-
   return (
     <div className="container mx-auto py-6">
       {isLoadingProfiles ? (
@@ -105,7 +96,6 @@ export default function ProfilesClient() {
           onEdit={(profile) => setProfileToEdit(profile)}
           onDelete={(profile) => setProfileToDelete(profile.userId)}
           onRowClick={handleViewProfile}
-          customActions={actions}
         />
       )}
 
@@ -123,12 +113,6 @@ export default function ProfilesClient() {
       <DeleteProfileDialog
         profileId={profileToDelete}
         onClose={() => setProfileToDelete(null)}
-      />
-
-      <AssignCompanyDialog
-        open={!!profileToAssign}
-        onOpenChange={(open) => !open && setProfileToAssign(null)}
-        profile={profileToAssign}
       />
     </div>
   );
