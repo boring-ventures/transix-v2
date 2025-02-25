@@ -71,20 +71,21 @@ export const sidebarData: SidebarData = {
         {
           title: "Rutas",
           url: "/routes",
-          icon: MapIcon,
+          icon: Route,
           items: [
             {
               title: "Lista de Rutas",
               url: "/routes/list",
               icon: Route,
             },
+            {
+              title: "Ubicaciones",
+              url: "/locations",
+              icon: MapPin,
+            },
           ],
         },
-        {
-          title: "Ubicaciones",
-          url: "/locations",
-          icon: MapPin,
-        },
+        
         {
           title: "Buses",
           url: "/buses",
