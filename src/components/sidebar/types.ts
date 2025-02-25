@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { Role } from "@prisma/client";
 
 interface User {
   name: string;
@@ -41,4 +42,22 @@ export interface SidebarData {
   navGroups: NavGroup[];
 }
 
-export type NavGroupProps = NavGroup;
+export interface NavItemProps {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+  badge?: string | number;
+  disabled?: boolean;
+  external?: boolean;
+  requiredRole?: Role[];
+  public?: boolean;
+}
+
+export interface NavGroupProps {
+  title: string;
+  items: NavItemProps[];
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+  requiredRole?: Role[];
+  public?: boolean;
+}

@@ -47,9 +47,12 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg ring-2 ring-primary/10">
-                <AvatarImage src={profile.avatarUrl || ""} alt={profile.fullName} />
+                <AvatarImage 
+                  src={profile.avatarUrl || ""} 
+                  alt={profile.fullName || user.email || "User"} 
+                />
                 <AvatarFallback className="rounded-lg bg-primary/10">
-                  {profile.fullName.split(' ').map(n => n[0]).join('')}
+                  {profile.fullName ? profile.fullName.split(' ').map(n => n[0]).join('') : user.email?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -68,9 +71,12 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg ring-2 ring-primary/10">
-                  <AvatarImage src={profile.avatarUrl || ""} alt={profile.fullName} />
+                  <AvatarImage 
+                    src={profile.avatarUrl || ""} 
+                    alt={profile.fullName || user.email || "User"} 
+                  />
                   <AvatarFallback className="rounded-lg bg-primary/10">
-                    {profile.fullName.split(' ').map(n => n[0]).join('')}
+                    {profile.fullName ? profile.fullName.split(' ').map(n => n[0]).join('') : user.email?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">

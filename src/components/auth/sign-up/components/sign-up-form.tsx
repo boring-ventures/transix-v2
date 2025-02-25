@@ -16,14 +16,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/utils/password-input";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
 import type { SignUpFormProps, SignUpFormData } from "@/types/auth/sign-up";
 import { signUpFormSchema } from "@/types/auth/sign-up";
 import { toast } from "@/components/ui/use-toast";
@@ -42,9 +34,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
     resolver: zodResolver(signUpFormSchema),
     defaultValues: {
       email: "",
-      username: "",
       fullName: "",
-      birthDate: new Date(),
       password: "",
       confirmPassword: "",
     },
@@ -66,10 +56,13 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
   async function onSubmit(data: SignUpFormData) {
     try {
       setIsLoading(true);
-      
+
       // First create the auth user
-      const { success, user, session, error } = await signUp(data.email, data.password);
-      
+      const { success, user, session, error } = await signUp(
+        data.email,
+        data.password
+      );
+
       if (!success || error || !session) {
         throw error || new Error("Failed to sign up");
       }
@@ -84,7 +77,8 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
             console.error("Avatar upload failed:", error);
             toast({
               title: "Warning",
-              description: "Failed to upload avatar, you can add it later from your profile.",
+              description:
+                "Failed to upload avatar, you can add it later from your profile.",
               variant: "default",
             });
           }
@@ -93,21 +87,39 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
         // Create profile immediately with user ID
         const response = await fetch("/api/profile", {
           method: "POST",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             userId: user.id,
-            username: data.username,
             fullName: data.fullName,
-            birthDate: data.birthDate,
+            email: data.email,
             avatarUrl,
           }),
         });
 
-        if (!response.ok) {
-          const result = await response.json();
-          throw new Error(result.error || "Failed to create profile");
+        let result: Record<string, unknown>;
+        let text = ""; // Define text outside the try block
+
+        try {
+          text = await response.text(); // Assign value inside try
+          result = text ? JSON.parse(text) : {};
+
+          if (!response.ok) {
+            throw new Error(
+              typeof result.error === "string"
+                ? result.error
+                : `Server responded with status ${response.status}`
+            );
+          }
+        } catch (parseError) {
+          console.error(
+            "Response parsing error:",
+            parseError,
+            "Response text:",
+            text
+          );
+          throw new Error("Invalid server response");
         }
 
         toast({
@@ -115,7 +127,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
           description: "Your account has been created successfully!",
         });
 
-        router.push('/dashboard');
+        router.push("/dashboard");
       }
     } catch (error) {
       console.error("Sign up error:", error);
@@ -177,20 +189,6 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
 
           <FormField
             control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Username</FormLabel>
-                <FormControl>
-                  <Input placeholder="johndoe" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
             name="fullName"
             render={({ field }) => (
               <FormItem>
@@ -198,48 +196,6 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
                 <FormControl>
                   <Input placeholder="John Doe" {...field} />
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="birthDate"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Date of birth</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
                 <FormMessage />
               </FormItem>
             )}

@@ -1,41 +1,516 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-enum UserRole {
-  USER
-  SUPERADMIN
+model Profile {
+  id            String               @id @default(uuid())
+  active        Boolean              @default(true)
+  branchId      String?              @map("branch_id")
+  companyId     String?              @map("company_id")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  email         String?
+  fullName      String?              @map("full_name")
+  updatedAt     DateTime             @default(now()) @map("updated_at")
+  userId        String               @unique @map("user_id")
+  role          Role                 @default(superadmin)
+  avatarUrl     String?              @map("avatar_url")
+  busLogs       BusLog[]
+  incidents     Incident[]
+  parcelUpdates ParcelStatusUpdate[]
+  branch        Branch?              @relation(fields: [branchId], references: [id])
+  company       Company?             @relation(fields: [companyId], references: [id])
+  tickets       Ticket[]
+
+  @@map("profiles")
 }
 
-model Profile {
+model Branch {
   id        String    @id @default(uuid())
-  userId    String    @unique // This matches Supabase auth.users.id
-  username  String    @unique
-  fullName  String
-  avatarUrl String?
-  role      UserRole  @default(USER)
-  
-  // Additional profile fields
-  bio       String?   @db.Text
-  birthDate DateTime
-  website   String?
-  location  String?
-  
-  // Timestamps
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  companyId String    @map("company_id")
+  name      String
+  address   String?
+  city      String?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @map("updated_at")
+  company   Company   @relation(fields: [companyId], references: [id])
+  profiles  Profile[]
 
-  @@map("profiles") // Matches Supabase's conventional naming
+  @@map("branches")
+}
+
+model BusAssignment {
+  id         String              @id @default(uuid())
+  busId      String              @map("bus_id")
+  routeId    String              @map("route_id")
+  scheduleId String              @map("schedule_id")
+  status     BusAssignmentStatus @default(active)
+  assignedAt DateTime            @default(now()) @map("assigned_at")
+  startTime  DateTime            @map("start_time")
+  endTime    DateTime            @map("end_time")
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @default(now()) @map("updated_at")
+  bus        Bus                 @relation(fields: [busId], references: [id])
+  route      Route               @relation(fields: [routeId], references: [id])
+  schedule   Schedule            @relation(fields: [scheduleId], references: [id])
+
+  @@map("bus_assignments")
+}
+
+model Company {
+  id               String            @id @default(uuid())
+  name             String
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @default(now()) @map("updated_at")
+  branches         Branch[]
+  busTypeTemplates BusTypeTemplate[]
+  buses            Bus[]
+  drivers          Driver[]
+  profiles         Profile[]
+  seatTiers        SeatTier[]
+
+  @@map("companies")
+}
+
+model Bus {
+  id                String            @id @default(uuid())
+  companyId         String            @map("company_id")
+  templateId        String            @map("template_id")
+  plateNumber       String            @unique @map("plate_number")
+  isActive          Boolean           @default(true) @map("is_active")
+  seatMatrix        String            @map("seat_matrix")
+  maintenanceStatus MaintenanceStatus @default(active) @map("maintenance_status_enum")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @default(now()) @map("updated_at")
+  assignments       BusAssignment[]
+  busSeats          BusSeat[]
+  company           Company           @relation(fields: [companyId], references: [id])
+  template          BusTypeTemplate   @relation(fields: [templateId], references: [id])
+  schedules         Schedule[]
+
+  @@map("buses")
+}
+
+model Route {
+  id                String          @id @default(uuid())
+  name              String
+  originId          String          @map("origin_id")
+  destinationId     String          @map("destination_id")
+  estimatedDuration Int             @map("estimated_duration")
+  active            Boolean         @default(true)
+  departureLane     String          @default("") @map("departure_lane")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @map("updated_at")
+  assignments       BusAssignment[]
+  routeSchedules    RouteSchedule[]
+  destination       Location        @relation("DestinationRoutes", fields: [destinationId], references: [id])
+  origin            Location        @relation("OriginRoutes", fields: [originId], references: [id])
+
+  @@map("routes")
+}
+
+model Schedule {
+  id                   String               @id @default(uuid())
+  routeId              String               @map("route_id")
+  routeScheduleId      String               @map("route_schedule_id")
+  busId                String?              @map("bus_id")
+  departureDate        DateTime             @map("departure_date")
+  estimatedArrivalTime DateTime             @map("estimated_arrival_time")
+  actualDepartureTime  DateTime?            @map("actual_departure_time")
+  actualArrivalTime    DateTime?            @map("actual_arrival_time")
+  price                Int
+  status               ScheduleStatus
+  primaryDriverId      String?              @map("primary_driver_id")
+  secondaryDriverId    String?              @map("secondary_driver_id")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @default(now()) @map("updated_at")
+  assignments          BusAssignment[]
+  occupancyLogs        OccupancyLog[]
+  parcels              Parcel[]
+  passengerLists       PassengerList[]
+  bus                  Bus?                 @relation(fields: [busId], references: [id])
+  primaryDriver        Driver?              @relation("PrimaryDriver", fields: [primaryDriverId], references: [id])
+  routeSchedule        RouteSchedule        @relation(fields: [routeScheduleId], references: [id])
+  secondaryDriver      Driver?              @relation("SecondaryDriver", fields: [secondaryDriverId], references: [id])
+  newReassignments     TicketReassignment[] @relation("NewSchedule")
+  oldReassignments     TicketReassignment[] @relation("OldSchedule")
+  tickets              Ticket[]
+  tripSettlements      TripSettlement[]
+
+  @@map("schedules")
+}
+
+model BusLog {
+  id         String    @id @default(uuid())
+  scheduleId String?   @map("schedule_id")
+  eventType  EventType @map("event_type")
+  timestamp  DateTime  @default(now())
+  locationId String?   @map("location_id")
+  loggedBy   String?   @map("logged_by")
+  location   Location? @relation(fields: [locationId], references: [id])
+  profile    Profile?  @relation(fields: [loggedBy], references: [id])
+
+  @@map("bus_logs")
+}
+
+model Ticket {
+  id            String               @id @default(uuid())
+  scheduleId    String?              @map("schedule_id")
+  customerId    String?              @map("customer_id")
+  busSeatId     String               @map("bus_seat_id")
+  status        TicketStatus         @default(active)
+  price         Decimal              @db.Decimal(10, 2)
+  purchasedBy   String?              @map("purchased_by")
+  notes         String?
+  purchasedAt   DateTime             @default(now()) @map("purchased_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @default(now()) @map("updated_at")
+  paymentLines  PaymentLine[]
+  cancellations TicketCancellation[]
+  reassignments TicketReassignment[]
+  busSeat       BusSeat              @relation(fields: [busSeatId], references: [id])
+  customer      Customer?            @relation(fields: [customerId], references: [id])
+  profile       Profile?             @relation(fields: [purchasedBy], references: [id])
+  schedule      Schedule?            @relation(fields: [scheduleId], references: [id])
+
+  @@map("tickets")
+}
+
+model Incident {
+  id          String       @id @default(uuid())
+  type        IncidentType
+  description String
+  reportedAt  DateTime     @default(now()) @map("reported_at")
+  reportedBy  String?      @map("reported_by")
+  profile     Profile?     @relation(fields: [reportedBy], references: [id])
+
+  @@map("incidents")
+}
+
+model ParcelStatusUpdate {
+  id        String       @id @default(uuid())
+  parcelId  String?      @map("parcel_id")
+  status    ParcelStatus @default(received)
+  updatedBy String?      @map("updated_by")
+  reason    String?
+  updatedAt DateTime     @default(now()) @map("updated_at")
+  parcel    Parcel?      @relation(fields: [parcelId], references: [id])
+  profile   Profile?     @relation(fields: [updatedBy], references: [id])
+
+  @@map("parcel_status_updates")
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  fullName        String   @map("full_name")
+  phone           String?
+  email           String?
+  documentId      String?  @unique @map("document_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @map("updated_at")
+  receivedParcels Parcel[] @relation("ReceiverParcels")
+  sentParcels     Parcel[] @relation("SenderParcels")
+  tickets         Ticket[]
+
+  @@map("customers")
+}
+
+model BusSeat {
+  id         String     @id @default(uuid())
+  busId      String?    @map("bus_id")
+  seatNumber String     @map("seat_number")
+  tierId     String     @map("tier_id")
+  status     SeatStatus @default(available)
+  isActive   Boolean    @default(true) @map("is_active")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @default(now()) @map("updated_at")
+  bus        Bus?       @relation(fields: [busId], references: [id])
+  tier       SeatTier   @relation(fields: [tierId], references: [id])
+  tickets    Ticket[]
+
+  @@map("bus_seats")
+}
+
+model BusTypeTemplate {
+  id                 String   @id @default(uuid())
+  companyId          String   @map("company_id")
+  name               String
+  description        String?
+  totalCapacity      Int      @map("total_capacity")
+  seatTemplateMatrix String   @map("seat_template_matrix")
+  isActive           Boolean  @default(true) @map("is_active")
+  type               String
+  seatsLayout        String   @map("seats_layout")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @default(now()) @map("updated_at")
+  company            Company  @relation(fields: [companyId], references: [id])
+  buses              Bus[]
+
+  @@map("bus_type_templates")
+}
+
+model Location {
+  id                String   @id @default(uuid())
+  name              String
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @map("updated_at")
+  busLogs           BusLog[]
+  destinationRoutes Route[]  @relation("DestinationRoutes")
+  originRoutes      Route[]  @relation("OriginRoutes")
+
+  @@map("locations")
+}
+
+model OccupancyLog {
+  id            String    @id @default(uuid())
+  scheduleId    String?   @map("schedule_id")
+  occupiedSeats Int       @map("occupied_seats")
+  recordedAt    DateTime  @default(now()) @map("recorded_at")
+  schedule      Schedule? @relation(fields: [scheduleId], references: [id])
+
+  @@map("occupancy_logs")
+}
+
+model Parcel {
+  id            String               @id @default(uuid())
+  scheduleId    String?              @map("schedule_id")
+  senderId      String?              @map("sender_id")
+  receiverId    String?              @map("receiver_id")
+  weight        Decimal
+  dimensions    String?
+  declaredValue Decimal              @map("declared_value")
+  status        ParcelStatus         @default(received)
+  price         Decimal              @db.Decimal(10, 2)
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @default(now()) @map("updated_at")
+  statusUpdates ParcelStatusUpdate[]
+  receiver      Customer?            @relation("ReceiverParcels", fields: [receiverId], references: [id])
+  schedule      Schedule?            @relation(fields: [scheduleId], references: [id])
+  sender        Customer?            @relation("SenderParcels", fields: [senderId], references: [id])
+  paymentLines  PaymentLine[]
+
+  @@map("parcels")
+}
+
+model SeatTier {
+  id          String    @id @default(uuid())
+  companyId   String    @map("company_id")
+  name        String
+  description String?
+  basePrice   Decimal   @map("base_price") @db.Decimal(10, 2)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+  busSeats    BusSeat[]
+  company     Company   @relation(fields: [companyId], references: [id])
+
+  @@map("seat_tiers")
+}
+
+model Payment {
+  id           String        @id @default(uuid())
+  amount       Decimal       @db.Decimal(10, 2)
+  method       PaymentMethod
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @default(now()) @map("updated_at")
+  invoices     Invoice[]
+  paymentLines PaymentLine[]
+
+  @@map("payments")
+}
+
+model PaymentLine {
+  id          String   @id @default(uuid())
+  paymentId   String?  @map("payment_id")
+  ticketId    String?  @map("ticket_id")
+  parcelId    String?  @map("parcel_id")
+  description String?
+  amount      Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  parcel      Parcel?  @relation(fields: [parcelId], references: [id])
+  payment     Payment? @relation(fields: [paymentId], references: [id])
+  ticket      Ticket?  @relation(fields: [ticketId], references: [id])
+
+  @@map("payment_lines")
+}
+
+model RouteSchedule {
+  id                   String     @id @default(uuid())
+  routeId              String     @map("route_id")
+  departureTime        DateTime   @map("departure_time")
+  operatingDays        String     @map("operating_days")
+  active               Boolean    @default(true)
+  seasonStart          DateTime?  @map("season_start")
+  seasonEnd            DateTime?  @map("season_end")
+  estimatedArrivalTime DateTime   @map("estimated_arrival_time")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @default(now()) @map("updated_at")
+  route                Route      @relation(fields: [routeId], references: [id])
+  schedules            Schedule[]
+
+  @@map("route_schedules")
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  paymentId     String?  @map("payment_id")
+  invoiceNumber String   @unique @map("invoice_number")
+  taxInfo       String
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @map("updated_at")
+  payment       Payment? @relation(fields: [paymentId], references: [id])
+
+  @@map("invoices")
+}
+
+model TicketCancellation {
+  id          String   @id @default(uuid())
+  ticketId    String?  @map("ticket_id")
+  reason      String
+  cancelledAt DateTime @default(now()) @map("cancelled_at")
+  ticket      Ticket?  @relation(fields: [ticketId], references: [id])
+
+  @@map("ticket_cancellations")
+}
+
+model TicketReassignment {
+  id            String    @id @default(uuid())
+  ticketId      String?   @map("ticket_id")
+  oldScheduleId String?   @map("old_schedule_id")
+  newScheduleId String?   @map("new_schedule_id")
+  reason        String
+  reassignedAt  DateTime  @default(now()) @map("reassigned_at")
+  newSchedule   Schedule? @relation("NewSchedule", fields: [newScheduleId], references: [id])
+  oldSchedule   Schedule? @relation("OldSchedule", fields: [oldScheduleId], references: [id])
+  ticket        Ticket?   @relation(fields: [ticketId], references: [id])
+
+  @@map("ticket_reassignments")
+}
+
+model PassengerList {
+  id         String          @id @default(uuid())
+  scheduleId String          @map("schedule_id")
+  documentId String?         @map("document_id")
+  fullName   String          @map("full_name")
+  seatNumber String          @map("seat_number")
+  status     PassengerStatus @default(confirmed)
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @default(now()) @map("updated_at")
+  schedule   Schedule        @relation(fields: [scheduleId], references: [id])
+
+  @@map("passenger_lists")
+}
+
+model TripSettlement {
+  id            String           @id @default(uuid())
+  scheduleId    String           @map("schedule_id")
+  totalIncome   Decimal          @map("total_income") @db.Decimal(10, 2)
+  totalExpenses Decimal          @map("total_expenses") @db.Decimal(10, 2)
+  netAmount     Decimal          @map("net_amount") @db.Decimal(10, 2)
+  status        SettlementStatus @default(pending)
+  details       String
+  settledAt     DateTime?        @map("settled_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @default(now()) @map("updated_at")
+  schedule      Schedule         @relation(fields: [scheduleId], references: [id])
+
+  @@map("trip_settlements")
+}
+
+model Driver {
+  id                 String     @id @default(uuid())
+  companyId          String     @map("company_id")
+  fullName           String     @map("full_name")
+  documentId         String     @map("document_id")
+  licenseNumber      String     @map("license_number")
+  licenseCategory    String     @map("license_category")
+  active             Boolean    @default(true)
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @default(now()) @map("updated_at")
+  company            Company    @relation(fields: [companyId], references: [id])
+  primarySchedules   Schedule[] @relation("PrimaryDriver")
+  secondarySchedules Schedule[] @relation("SecondaryDriver")
+
+  @@map("drivers")
+}
+
+enum BusAssignmentStatus {
+  active
+  completed
+  cancelled
+}
+
+enum EventType {
+  arrival
+  departure
+}
+
+enum IncidentType {
+  complaint
+  delay
+  accident
+}
+
+enum MaintenanceStatus {
+  active
+  in_maintenance
+  retired
+}
+
+enum ParcelStatus {
+  received
+  in_transit
+  ready_for_pickup
+  delivered
+  cancelled
+}
+
+enum PaymentMethod {
+  cash
+  card
+  bank_transfer
+  qr
+}
+
+enum Role {
+  superadmin
+  company_admin
+  branch_admin
+  seller
+}
+
+enum ScheduleStatus {
+  scheduled
+  in_progress
+  completed
+  cancelled
+  delayed
+}
+
+enum SeatStatus {
+  available
+  maintenance
+}
+
+enum TicketStatus {
+  active
+  cancelled
+}
+
+enum PassengerStatus {
+  confirmed
+  cancelled
+  no_show
+}
+
+enum SettlementStatus {
+  pending
+  settled
 }
