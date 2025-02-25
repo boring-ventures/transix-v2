@@ -4,31 +4,28 @@ import type { Prisma } from "@prisma/client";
 // Get all drivers for a specific company
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const active = searchParams.get("active");
     const licenseCategory = searchParams.get("licenseCategory");
-    
+
     // Check if company exists
     const company = await prisma.company.findUnique({
       where: { id },
     });
-    
+
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
-    
+
     // Build where clause
     const whereClause: Prisma.DriverWhereInput = { companyId: id };
     if (active !== null) whereClause.active = active === "true";
     if (licenseCategory) whereClause.licenseCategory = licenseCategory;
-    
+
     // Get drivers
     const drivers = await prisma.driver.findMany({
       where: whereClause,
@@ -36,7 +33,7 @@ export async function GET(
         fullName: "asc",
       },
     });
-    
+
     return NextResponse.json({ drivers });
   } catch (error) {
     console.error("Error fetching company drivers:", error);
@@ -50,10 +47,10 @@ export async function GET(
 // Create a new driver for a specific company
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const json = await request.json();
     const { fullName, documentId, licenseNumber, licenseCategory, active } = json;
     

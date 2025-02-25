@@ -34,7 +34,7 @@ export function DeleteCompanyDialog({
           const company = await fetchCompany(companyId);
           setCompanyName(company.name);
         } catch (err) {
-          console.error("Error fetching company details:", err);
+          console.error("Error al obtener detalles de la empresa:", err);
         }
       };
       getCompanyDetails();
@@ -49,7 +49,9 @@ export function DeleteCompanyDialog({
       await deleteCompany.mutateAsync(companyId);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete company");
+      setError(
+        err instanceof Error ? err.message : "Error al desactivar la empresa"
+      );
     }
   };
 
@@ -57,22 +59,26 @@ export function DeleteCompanyDialog({
     <AlertDialog open={!!companyId} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogTitle>¿Está completamente seguro?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete the company <strong>{companyName}</strong> and cannot be undone.
-            <br /><br />
-            Note: Companies with associated branches, profiles, buses, or drivers cannot be deleted.
+            Esto desactivará la empresa <strong>{companyName}</strong>. La
+            empresa no aparecerá en las listas, pero sus datos se conservarán en
+            el sistema.
+            <br />
+            <br />
+            Nota: Las empresas con sucursales, perfiles, buses o conductores
+            activos deben desactivar primero estos elementos.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        
+
         {error && (
           <div className="text-sm font-medium text-destructive bg-destructive/10 p-3 rounded-md">
             {error}
           </div>
         )}
-        
+
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
@@ -84,10 +90,10 @@ export function DeleteCompanyDialog({
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
+                Desactivando...
               </>
             ) : (
-              "Delete"
+              "Desactivar"
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import type { NextRequest } from "next/server";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 // Get a specific company by ID
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
-    
+    const { id } = await params;
+
     const company = await prisma.company.findUnique({
       where: { id },
       include: {
@@ -22,117 +25,141 @@ export async function GET(
         },
       },
     });
-    
+
     if (!company) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { message: "Empresa no encontrada" },
         { status: 404 }
       );
     }
-    
+
     return NextResponse.json({ company });
   } catch (error) {
-    console.error("Error fetching company:", error);
+    console.error("Error al obtener la empresa:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { message: "Error al obtener la empresa" },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
 // Update a company
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
-    const json = await request.json();
-    const { name, active } = json;
-    
+    const companyId = (await params).id;
+    const data = await req.json();
+
+    // Validate required fields
+    if (!data.name) {
+      return NextResponse.json(
+        { message: "El nombre de la empresa es requerido" },
+        { status: 400 }
+      );
+    }
+
     // Check if company exists
     const existingCompany = await prisma.company.findUnique({
-      where: { id },
+      where: { id: companyId },
     });
-    
+
     if (!existingCompany) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { message: "Empresa no encontrada" },
         { status: 404 }
       );
     }
-    
+
     // Update company
     const updatedCompany = await prisma.company.update({
-      where: { id },
+      where: { id: companyId },
       data: {
-        name: name !== undefined ? name : undefined,
-        active: active !== undefined ? active : undefined,
-        updatedAt: new Date(),
+        name: data.name,
+        active: data.active,
       },
     });
-    
-    return NextResponse.json({ company: updatedCompany });
+
+    return NextResponse.json({
+      message: "Empresa actualizada exitosamente",
+      company: updatedCompany,
+    });
   } catch (error) {
-    console.error("Error updating company:", error);
+    console.error("Error al actualizar la empresa:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { message: "Error al actualizar la empresa" },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
 // Delete a company
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
-    
+    const { id } = await params;
+
     // Check if company exists
     const existingCompany = await prisma.company.findUnique({
       where: { id },
+      include: {
+        _count: {
+          select: {
+            branches: true,
+            profiles: true,
+            buses: true,
+            drivers: true,
+          },
+        },
+      },
     });
-    
+
     if (!existingCompany) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { message: "Empresa no encontrada" },
         { status: 404 }
       );
     }
-    
-    // Check for related records
-    const relatedRecordsCount = await prisma.$transaction([
-      prisma.branch.count({ where: { companyId: id } }),
-      prisma.profile.count({ where: { companyId: id } }),
-      prisma.bus.count({ where: { companyId: id } }),
-      prisma.driver.count({ where: { companyId: id } }),
-    ]);
-    
-    const totalRelatedRecords = relatedRecordsCount.reduce((sum, count) => sum + count, 0);
-    
-    if (totalRelatedRecords > 0) {
+
+    // Check if company has related entities
+    const hasRelatedEntities =
+      existingCompany._count.branches > 0 ||
+      existingCompany._count.profiles > 0 ||
+      existingCompany._count.buses > 0 ||
+      existingCompany._count.drivers > 0;
+
+    if (hasRelatedEntities) {
       return NextResponse.json(
-        { 
-          error: "Cannot delete company with related records",
-          details: "This company has associated branches, profiles, buses, or drivers"
+        {
+          message:
+            "No se puede eliminar la empresa porque tiene elementos asociados. Elimine primero todas las sucursales, perfiles, buses y conductores.",
         },
-        { status: 409 }
+        { status: 400 }
       );
     }
-    
+
     // Delete the company
     await prisma.company.delete({
       where: { id },
     });
-    
-    return NextResponse.json({ message: "Company deleted successfully" });
+
+    return NextResponse.json({
+      message: "Empresa eliminada exitosamente",
+    });
   } catch (error) {
-    console.error("Error deleting company:", error);
+    console.error("Error al eliminar la empresa:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { message: "Error al eliminar la empresa" },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 } 

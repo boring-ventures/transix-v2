@@ -1,4 +1,4 @@
-import type { UserRole } from "@prisma/client";
+import type { Role } from "@prisma/client";
 
 export interface Profile {
   id: string;
@@ -6,7 +6,7 @@ export interface Profile {
   username: string;
   fullName: string;
   avatarUrl: string | null;
-  role: UserRole;
+  role: Role;
   bio: string | null;
   birthDate: Date;
-} 
+}

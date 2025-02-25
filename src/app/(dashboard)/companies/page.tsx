@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import CompaniesClient from "./companies-client";
 
 export const metadata: Metadata = {
-  title: "Companies | Transix",
-  description: "Manage transportation companies",
+  title: "Empresas | Transix",
+  description: "Gestionar empresas de transporte",
 };
 
 export default function CompaniesPage() {

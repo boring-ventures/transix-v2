@@ -20,7 +20,7 @@ import { profileFormSchema } from "@/lib/validations/profile";
 import type { ProfileFormValues } from "@/lib/validations/profile";
 
 export function ProfileForm() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -45,7 +45,7 @@ export function ProfileForm() {
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to update profile. Please try again.",
@@ -99,6 +99,7 @@ export function ProfileForm() {
                   placeholder="Tell us a little bit about yourself"
                   className="resize-none"
                   {...field}
+                  value={field.value || ''}
                 />
               </FormControl>
               <FormDescription>

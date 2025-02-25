@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useCompanies, CompanyFormData } from "@/hooks/use-companies";
+import { useCompanies, type CompanyFormData } from "@/hooks/use-companies";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +27,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Company name must be at least 2 characters"),
+  name: z
+    .string()
+    .min(2, "El nombre de la empresa debe tener al menos 2 caracteres"),
   active: z.boolean().default(true),
 });
 
@@ -59,8 +61,8 @@ export function CreateCompanyDialog({
       await createCompany.mutateAsync(data as CompanyFormData);
       form.reset();
       onOpenChange(false);
-    } catch (err) {
-      setError("Failed to create company. Please try again.");
+    } catch {
+      setError("Error al crear la empresa. Por favor, inténtelo de nuevo.");
     }
   };
 
@@ -68,9 +70,9 @@ export function CreateCompanyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Company</DialogTitle>
+          <DialogTitle>Crear Nueva Empresa</DialogTitle>
           <DialogDescription>
-            Add a new transportation company to the system.
+            Añadir una nueva empresa de transporte al sistema.
           </DialogDescription>
         </DialogHeader>
 
@@ -81,9 +83,12 @@ export function CreateCompanyDialog({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company Name</FormLabel>
+                  <FormLabel>Nombre de la Empresa</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter company name" {...field} />
+                    <Input
+                      placeholder="Ingrese el nombre de la empresa"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -102,16 +107,18 @@ export function CreateCompanyDialog({
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>Active</FormLabel>
+                    <FormLabel>Activo</FormLabel>
                     <p className="text-sm text-muted-foreground">
-                      Company will be available in the system
+                      La empresa estará disponible en el sistema
                     </p>
                   </div>
                 </FormItem>
               )}
             />
 
-            {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+            {error && (
+              <p className="text-sm font-medium text-destructive">{error}</p>
+            )}
 
             <DialogFooter>
               <Button
@@ -120,11 +127,13 @@ export function CreateCompanyDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={isCreating}
               >
-                Cancel
+                Cancelar
               </Button>
               <Button type="submit" disabled={isCreating}>
-                {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Company
+                {isCreating && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Crear Empresa
               </Button>
             </DialogFooter>
           </form>

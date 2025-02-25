@@ -31,7 +31,7 @@ import { profileFormSchema } from "@/lib/validations/profile";
 import type { ProfileFormValues } from "@/lib/validations/profile";
 
 export function ProfileForm() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<ProfileFormValues | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -43,7 +43,7 @@ export function ProfileForm() {
       fullName: profile?.fullName || "",
       bio: profile?.bio || "",
       birthDate: profile?.birthDate ? new Date(profile.birthDate) : null,
-      role: profile?.role || "USER",
+      role: profile?.role || "seller",
       avatarUrl: null,
     },
   });
@@ -98,7 +98,8 @@ export function ProfileForm() {
         ...pendingChanges,
         avatarUrl: null,
       });
-    } catch (error) {
+    } catch (err) {
+      console.error("Profile update error:", err);
       toast({
         title: "Error",
         description: "Failed to update profile. Please try again.",
@@ -118,15 +119,14 @@ export function ProfileForm() {
           <FormField
             control={form.control}
             name="avatarUrl"
-            render={({ field: { onChange, value, ...field } }) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>Profile Picture</FormLabel>
                 <FormControl>
                   <Input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => onChange(e.target.files)}
-                    {...field}
+                    onChange={(e) => field.onChange(e.target.files)}
                   />
                 </FormControl>
                 <FormDescription>
@@ -196,7 +196,7 @@ export function ProfileForm() {
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={field.value}
+                      selected={field.value as Date | undefined}
                       onSelect={field.onChange}
                       disabled={(date) =>
                         date > new Date() || date < new Date("1900-01-01")
@@ -221,6 +221,7 @@ export function ProfileForm() {
                     placeholder="Tell us a little bit about yourself"
                     className="resize-none"
                     {...field}
+                    value={field.value || ''}
                   />
                 </FormControl>
                 <FormDescription>

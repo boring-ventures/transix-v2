@@ -1,8 +1,16 @@
 import * as z from "zod";
-import type { UserRole } from "@prisma/client";
+import { Role } from "@prisma/client";
 
 const MAX_FILE_SIZE = 5000000; // 5MB
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
+// Convert Prisma enum to string literal union type for Zod
+const roleEnum = z.enum([
+  Role.superadmin,
+  Role.company_admin, 
+  Role.branch_admin, 
+  Role.seller
+]);
 
 export const profileFormSchema = z.object({
   username: z
@@ -21,7 +29,7 @@ export const profileFormSchema = z.object({
   avatarUrl: z
     .any()
     .refine((files) => !files || files?.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, 
-      `Max file size is 5MB.`)
+      "Max file size is 5MB.")
     .refine(
       (files) => !files || files?.length === 0 || ACCEPTED_IMAGE_TYPES.includes(files?.[0]?.type),
       "Only .jpg, .jpeg, .png and .webp formats are supported."
@@ -29,7 +37,7 @@ export const profileFormSchema = z.object({
     .optional()
     .nullable(),
   birthDate: z.date().optional().nullable(),
-  role: z.enum(["USER", "ADMIN"]).default("USER"),
+  role: roleEnum.optional(),
 });
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>; 

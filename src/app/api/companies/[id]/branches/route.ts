@@ -4,23 +4,20 @@ import type { Prisma } from "@prisma/client";
 // Get all branches for a specific company
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const active = searchParams.get("active");
-    
+
     // Check if company exists
     const company = await prisma.company.findUnique({
       where: { id },
     });
-    
+
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
     // Build where clause
@@ -28,7 +25,7 @@ export async function GET(
     if (active !== null) {
       whereClause.active = active === "true";
     }
-    
+
     // Get branches
     const branches = await prisma.branch.findMany({
       where: whereClause,
@@ -36,7 +33,7 @@ export async function GET(
         name: "asc",
       },
     });
-    
+
     return NextResponse.json({ branches });
   } catch (error) {
     console.error("Error fetching company branches:", error);
@@ -50,10 +47,10 @@ export async function GET(
 // Create a new branch for a specific company
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const json = await request.json();
     const { name, address, city, active } = json;
     

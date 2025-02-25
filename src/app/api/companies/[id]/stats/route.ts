@@ -3,23 +3,20 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
-    
+    const { id } = await params;
+
     // Check if company exists
     const company = await prisma.company.findUnique({
       where: { id },
     });
-    
+
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
-    
+
     // Get counts of related entities
     const [
       branchesCount,
@@ -28,7 +25,7 @@ export async function GET(
       driversCount,
       templatesCount,
       seatTiersCount,
-      activeBusesCount
+      activeBusesCount,
     ] = await prisma.$transaction([
       prisma.branch.count({ where: { companyId: id } }),
       prisma.profile.count({ where: { companyId: id } }),
@@ -38,7 +35,7 @@ export async function GET(
       prisma.seatTier.count({ where: { companyId: id } }),
       prisma.bus.count({ where: { companyId: id, isActive: true } }),
     ]);
-    
+
     // Get statistics
     const stats = {
       branchesCount,
@@ -50,7 +47,7 @@ export async function GET(
       activeBusesCount,
       inactiveBusesCount: busesCount - activeBusesCount,
     };
-    
+
     return NextResponse.json({ stats });
   } catch (error) {
     console.error("Error fetching company statistics:", error);

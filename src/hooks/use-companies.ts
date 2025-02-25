@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
@@ -20,12 +20,9 @@ export type Company = {
 export type Branch = {
   id: string;
   name: string;
-  address: string | null;
-  city: string | null;
+  address?: string;
+  city?: string;
   active: boolean;
-  companyId: string;
-  createdAt: string;
-  updatedAt: string;
 };
 
 export type CompanyStats = {
@@ -33,33 +30,28 @@ export type CompanyStats = {
   profilesCount: number;
   busesCount: number;
   driversCount: number;
-  templatesCount: number;
-  seatTiersCount: number;
-  activeBusesCount: number;
-  inactiveBusesCount: number;
 };
 
 export type CompanyFormData = {
   name: string;
-  active?: boolean;
+  active: boolean;
 };
 
-export function useCompanies() {
+export function useCompanies(fetchInactive = false) {
   const queryClient = useQueryClient();
-  const [isCreating, setIsCreating] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Fetch all companies
+  // Fetch all companies (active by default)
   const {
     data: companies = [],
     isLoading: isLoadingCompanies,
     error: companiesError,
     refetch: refetchCompanies,
   } = useQuery({
-    queryKey: ["companies"],
+    queryKey: ["companies", { fetchInactive }],
     queryFn: async () => {
-      const response = await axios.get("/api/companies");
+      const response = await axios.get(
+        `/api/companies${fetchInactive ? "?includeInactive=true" : ""}`
+      );
       return response.data.companies;
     },
   });
@@ -79,84 +71,67 @@ export function useCompanies() {
   // Create a new company
   const createCompany = useMutation({
     mutationFn: async (data: CompanyFormData) => {
-      setIsCreating(true);
-      try {
-        const response = await axios.post("/api/companies", data);
-        return response.data.company;
-      } finally {
-        setIsCreating(false);
-      }
+      const response = await axios.post("/api/companies", data);
+      return response.data.company;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       toast({
-        title: "Success",
-        description: "Company created successfully",
+        title: "Éxito",
+        description: "Empresa creada exitosamente",
       });
     },
-    onError: (error) => {
-      console.error("Error creating company:", error);
+    onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create company",
+        description: "Error al crear la empresa",
         variant: "destructive",
       });
     },
   });
 
-  // Update a company
+  // Update an existing company
   const updateCompany = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: CompanyFormData }) => {
-      setIsUpdating(true);
-      try {
-        const response = await axios.patch(`/api/companies/${id}`, data);
-        return response.data.company;
-      } finally {
-        setIsUpdating(false);
-      }
+      const response = await axios.patch(`/api/companies/${id}`, data);
+      return response.data.company;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
-      queryClient.invalidateQueries({ queryKey: ["company", variables.id] });
       toast({
-        title: "Success",
-        description: "Company updated successfully",
+        title: "Éxito",
+        description: "Empresa actualizada exitosamente",
       });
     },
-    onError: (error) => {
-      console.error("Error updating company:", error);
+    onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update company",
+        description: "Error al actualizar la empresa",
         variant: "destructive",
       });
     },
   });
 
-  // Delete a company
+  // Soft delete a company (set active to false)
   const deleteCompany = useMutation({
     mutationFn: async (id: string) => {
-      setIsDeleting(true);
-      try {
-        const response = await axios.delete(`/api/companies/${id}`);
-        return response.data;
-      } finally {
-        setIsDeleting(false);
-      }
+      // Instead of DELETE, we'll use PATCH to update the active status
+      const response = await axios.patch(`/api/companies/${id}/deactivate`);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       toast({
-        title: "Success",
-        description: "Company deleted successfully",
+        title: "Éxito",
+        description: "Empresa desactivada exitosamente",
       });
     },
-    onError: (error: unknown) => {
-      console.error("Error deleting company:", error);
-      const errorMessage = axios.isAxiosError(error) 
-        ? error.response?.data?.details || "Failed to delete company"
-        : "Failed to delete company";
-        
+    onError: (error) => {
+      const errorMessage =
+        axios.isAxiosError(error) && error.response?.data?.message
+          ? error.response.data.message
+          : "Error al desactivar la empresa";
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -167,7 +142,6 @@ export function useCompanies() {
 
   // Search companies
   const searchCompanies = useCallback(async (query: string) => {
-    if (!query) return [];
     const response = await axios.get(`/api/companies/search?q=${query}`);
     return response.data.companies;
   }, []);
@@ -183,8 +157,8 @@ export function useCompanies() {
     updateCompany,
     deleteCompany,
     searchCompanies,
-    isCreating,
-    isUpdating,
-    isDeleting,
+    isCreating: createCompany.isPending,
+    isUpdating: updateCompany.isPending,
+    isDeleting: deleteCompany.isPending,
   };
-} 
+}

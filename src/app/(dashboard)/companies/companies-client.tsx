@@ -26,39 +26,39 @@ export default function CompaniesClient() {
   const columns: Column<Company>[] = [
     {
       id: "name",
-      header: "Name",
+      header: "Nombre",
       accessorKey: "name",
       sortable: true,
     },
     {
       id: "status",
-      header: "Status",
+      header: "Estado",
       accessorKey: "active",
       sortable: true,
       cell: ({ row }) => (
         <Badge variant={row.active ? "default" : "destructive"}>
-          {row.active ? "Active" : "Inactive"}
+          {row.active ? "Activo" : "Inactivo"}
         </Badge>
       ),
     },
     {
       id: "createdAt",
-      header: "Created",
+      header: "Creado",
       accessorKey: "createdAt",
       sortable: true,
-      cell: ({ row }) => format(new Date(row.createdAt), "MMM d, yyyy"),
+      cell: ({ row }) => format(new Date(row.createdAt), "d MMM, yyyy"),
     },
     {
       id: "branches",
-      header: "Branches",
+      header: "Sucursales",
       accessorKey: "_count",
       cell: ({ row }) => {
-        return (row.branches?.length || 0);
+        return row.branches?.length || 0;
       },
     },
     {
       id: "users",
-      header: "Users",
+      header: "Usuarios",
       accessorKey: "_count",
       cell: ({ row }) => row._count?.profiles || 0,
     },
@@ -76,8 +76,8 @@ export default function CompaniesClient() {
         <LoadingTable columnCount={7} rowCount={5} />
       ) : (
         <DataTable
-          title="Companies List"
-          description="View and manage all transportation companies"
+          title="Lista de Empresas"
+          description="Ver y gestionar todas las empresas de transporte"
           data={companies}
           columns={columns}
           searchable={true}

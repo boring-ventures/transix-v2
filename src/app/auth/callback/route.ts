@@ -22,10 +22,8 @@ export async function GET(request: NextRequest) {
           await prisma.profile.create({
             data: {
               userId: session.user.id,
-              username: "", // Will be updated in profile setup
               fullName: "", // Will be updated in profile setup
-              birthDate: new Date(), // Will be updated in profile setup
-              role: "USER",
+              role: "superadmin",
             },
           });
         } catch (error) {

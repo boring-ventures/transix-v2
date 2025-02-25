@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import CompanyDetailClient from "./company-detail-client";
 
-
 export const metadata: Metadata = {
-  title: "Company Details | Transix",
-  description: "View company details",
+  title: "Detalles de Empresa | Transix",
+  description: "Ver detalles de la empresa",
 };
 
-export default function CompanyDetailPage({
+export default async function CompanyDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  return <CompanyDetailClient id={params.id} />;
+  const { id } = await params;
+  return <CompanyDetailClient id={id} />;
 } 
