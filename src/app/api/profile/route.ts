@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     if (!userId) {
       return new Response(JSON.stringify({ error: "User ID is required" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" }
       });
     }
 
@@ -20,13 +20,10 @@ export async function POST(req: Request) {
     });
 
     if (existingProfile) {
-      return new Response(
-        JSON.stringify({ error: "Profile already exists for this user" }),
-        {
-          status: 409,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ error: "Profile already exists for this user" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
     // Create minimal profile first
@@ -34,8 +31,8 @@ export async function POST(req: Request) {
       data: {
         userId: userId,
         role: "superadmin",
-        active: true,
-      },
+        active: true
+      }
     });
 
     // If successful, update with additional fields
@@ -48,29 +45,25 @@ export async function POST(req: Request) {
           companyId: companyId || null,
           branchId: branchId || null,
           avatarUrl: avatarUrl || null,
-        },
+        }
       });
-
+      
       return new Response(JSON.stringify({ profile: updatedProfile }), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" }
       });
     }
 
     return new Response(JSON.stringify({ profile }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" }
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: "Internal server error", details: errorMessage }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ error: "Internal server error", details: errorMessage }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 }
 
