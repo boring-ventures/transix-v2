@@ -99,11 +99,17 @@ export function useBusSeats(busId?: string) {
 
   // Update an existing bus seat
   const updateSeat = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Omit<BusSeatFormData, "busId" | "seatNumber">> }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Partial<Omit<BusSeatFormData, "busId" | "seatNumber">>;
+    }) => {
       const response = await axios.patch(`/api/bus-seats/${id}`, data);
       return response.data.busSeat;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       // We need to get the busId from the seat to invalidate the correct query
       queryClient.invalidateQueries({ queryKey: ["busSeats"] });
       toast({
@@ -116,7 +122,7 @@ export function useBusSeats(busId?: string) {
         axios.isAxiosError(error) && error.response?.data?.error
           ? error.response.data.error
           : "Error al actualizar el asiento";
-      
+
       toast({
         title: "Error",
         description: errorMessage,

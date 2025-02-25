@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useBusTemplates, type BusTemplate } from "@/hooks/use-bus-templates";
+import { useSeatTiers } from "@/hooks/use-seat-tiers";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,22 +14,23 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Bus, Building, Grid } from "lucide-react";
+import { ArrowLeft, Bus, Building } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { EditBusTemplateDialog } from "../components/edit-bus-template-dialog";
 import { SeatMatrixViewer } from "../components/seat-matrix-viewer";
 
 interface BusTemplateDetailClientProps {
   id: string;
 }
 
-export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientProps) {
+export default function BusTemplateDetailClient({
+  id,
+}: BusTemplateDetailClientProps) {
   const router = useRouter();
   const { fetchTemplate } = useBusTemplates();
   const [template, setTemplate] = useState<BusTemplate | null>(null);
+  const { seatTiers } = useSeatTiers(template?.companyId);
   const [isLoading, setIsLoading] = useState(true);
-  const [showEditDialog, setShowEditDialog] = useState(false);
 
   useEffect(() => {
     const loadTemplateData = async () => {
@@ -48,11 +50,7 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
 
   return (
     <div className="container mx-auto py-6">
-      <Button 
-        variant="outline" 
-        onClick={() => router.back()}
-        className="mb-6"
-      >
+      <Button variant="outline" onClick={() => router.back()} className="mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" />
         Volver
       </Button>
@@ -71,7 +69,9 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
         <>
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{template.name}</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {template.name}
+              </h1>
               <p className="text-muted-foreground">
                 {template.description || "Sin descripción"}
               </p>
@@ -80,9 +80,6 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
               <Badge variant={template.isActive ? "default" : "destructive"}>
                 {template.isActive ? "Activo" : "Inactivo"}
               </Badge>
-              <Button onClick={() => setShowEditDialog(true)}>
-                Editar Plantilla
-              </Button>
             </div>
           </div>
 
@@ -103,11 +100,17 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
                     <div className="space-y-4">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Tipo:</span>
-                        <span className="font-medium capitalize">{template.type}</span>
+                        <span className="font-medium capitalize">
+                          {template.type}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Capacidad Total:</span>
-                        <span className="font-medium">{template.totalCapacity} asientos</span>
+                        <span className="text-muted-foreground">
+                          Capacidad Total:
+                        </span>
+                        <span className="font-medium">
+                          {template.totalCapacity} asientos
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Creado:</span>
@@ -116,7 +119,9 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Actualizado:</span>
+                        <span className="text-muted-foreground">
+                          Actualizado:
+                        </span>
                         <span className="font-medium">
                           {format(new Date(template.updatedAt), "d MMM, yyyy")}
                         </span>
@@ -132,8 +137,12 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Buses Asociados:</span>
-                        <span className="font-medium">{template._count?.buses || 0}</span>
+                        <span className="text-muted-foreground">
+                          Buses Asociados:
+                        </span>
+                        <span className="font-medium">
+                          {template._count?.buses || 0}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
@@ -150,7 +159,10 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <SeatMatrixViewer seatMatrix={template.seatTemplateMatrix} />
+                  <SeatMatrixViewer
+                    matrix={template.seatTemplateMatrix}
+                    seatTiers={seatTiers || []}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -171,7 +183,12 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
                         <div className="flex items-center mt-2">
                           <Building className="h-5 w-5 mr-2 text-muted-foreground" />
                           <span>{template.company.name}</span>
-                          <Badge variant={template.company.active ? "outline" : "secondary"} className="ml-2">
+                          <Badge
+                            variant={
+                              template.company.active ? "outline" : "secondary"
+                            }
+                            className="ml-2"
+                          >
                             {template.company.active ? "Activa" : "Inactiva"}
                           </Badge>
                         </div>
@@ -180,24 +197,22 @@ export default function BusTemplateDetailClient({ id }: BusTemplateDetailClientP
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8">
                       <Building className="h-12 w-12 text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">Plantilla sin empresa asignada</p>
+                      <p className="text-muted-foreground">
+                        Plantilla sin empresa asignada
+                      </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
-
-          <EditBusTemplateDialog
-            open={showEditDialog}
-            onOpenChange={setShowEditDialog}
-            template={template}
-          />
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-12">
           <Bus className="h-16 w-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Plantilla No Encontrada</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            Plantilla No Encontrada
+          </h2>
           <p className="text-muted-foreground">
             La plantilla que está buscando no existe o ha sido eliminada.
           </p>

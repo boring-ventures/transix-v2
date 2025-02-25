@@ -1,11 +1,35 @@
-import type { Metadata } from "next";
-import BusTemplatesClient from "./bus-templates-client";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Plantillas de Bus | Transix",
-  description: "Gestionar plantillas de buses para la flota",
-};
+import { useState } from "react";
+import { useBusTemplates } from "@/hooks/use-bus-templates";
+
+import { BusTemplatesTable } from "./components/bus-templates-table";
+import { CreateBusTemplateDialog } from "./components/create-bus-template-dialog";
+import { LoadingTable } from "@/components/table/loading-table";
 
 export default function BusTemplatesPage() {
-  return <BusTemplatesClient />;
-} 
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  const { templates, isLoadingTemplates } = useBusTemplates();
+
+  return (
+    <div className="space-y-6">
+
+      {isLoadingTemplates ? (
+        <LoadingTable columnCount={5} rowCount={5} />
+      ) : (
+        <BusTemplatesTable
+          data={templates}
+          title="Plantillas de Bus"
+          description="Gestiona las plantillas de bus para tus vehículos"
+          onAdd={() => setShowCreateDialog(true)}
+        />
+      )}
+
+      <CreateBusTemplateDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+      />
+    </div>
+  );
+}

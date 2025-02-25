@@ -147,7 +147,7 @@ export function SeatMatrixEditor({
       };
     } else if (!checked && updatedMatrix.secondFloor) {
       // Remove the second floor completely
-      delete updatedMatrix.secondFloor;
+      updatedMatrix.secondFloor = undefined;
     }
     
     onChange(updatedMatrix);

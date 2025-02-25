@@ -1,8 +1,8 @@
 "use client";
 
-import { useSeatTiers, type SeatTier } from "@/hooks/use-seat-tiers";
 import { cn } from "@/lib/utils";
-import type { SeatMatrix } from "@/hooks/use-bus-templates";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { SeatTier } from "@/hooks/use-seat-tiers";
 
 interface SeatPosition {
   id: string;
@@ -14,77 +14,78 @@ interface SeatPosition {
   status: string;
 }
 
-interface SeatMatrixViewerProps {
-  seatMatrix: SeatMatrix;
+interface SeatMatrixFloor {
+  dimensions: {
+    rows: number;
+    seatsPerRow: number;
+  };
+  seats: SeatPosition[];
 }
 
-export function SeatMatrixViewer({ seatMatrix }: SeatMatrixViewerProps) {
-  const { seatTiers } = useSeatTiers();
+interface SeatTemplateMatrix {
+  firstFloor: SeatMatrixFloor;
+  secondFloor?: SeatMatrixFloor;
+}
 
-  if (!seatMatrix || !seatMatrix.firstFloor) {
-    return (
-      <div className="text-muted-foreground">
-        No hay configuración de asientos disponible
-      </div>
-    );
-  }
+interface SeatMatrixViewerProps {
+  matrix: SeatTemplateMatrix;
+  seatTiers: SeatTier[];
+  className?: string;
+}
 
-  const hasSecondFloor = !!seatMatrix.secondFloor;
-
+export function SeatMatrixViewer({
+  matrix,
+  seatTiers,
+  className,
+}: SeatMatrixViewerProps) {
   const renderSeat = (seat: SeatPosition) => {
-    if (seat.isEmpty) {
-      return (
-        <div
-          key={seat.id}
-          className="w-12 h-12 border border-dashed border-gray-300 rounded-md flex items-center justify-center text-gray-400"
-        >
-          <span className="text-xs">Vacío</span>
-        </div>
-      );
-    }
-
-    const tier = seatTiers?.find((t: SeatTier) => t.id === seat.tierId);
+    const seatTier = seatTiers.find((tier) => tier.id === seat.tierId);
 
     return (
       <div
         key={seat.id}
         className={cn(
-          "w-12 h-12 border rounded-md flex flex-col items-center justify-center",
-          tier ? "bg-primary/10 border-primary" : "bg-gray-100 border-gray-300"
+          "w-12 h-12 flex items-center justify-center rounded-md border text-xs font-medium",
+          seat.isEmpty
+            ? "bg-gray-100 text-gray-400 border-dashed"
+            : seat.tierId
+              ? "bg-white border-primary"
+              : "bg-red-50 border-red-300"
         )}
+        title={seatTier?.name || "Sin tipo asignado"}
       >
-        <span className="text-xs font-medium">{seat.name}</span>
-        {tier && (
-          <span className="text-[10px] text-primary-foreground bg-primary px-1 rounded mt-1">
-            {tier.name}
-          </span>
-        )}
+        <div className="flex flex-col items-center">
+          <span>{seat.name}</span>
+          {!seat.isEmpty && seat.tierId && (
+            <span className="text-[10px] text-muted-foreground">
+              {seatTier?.name.substring(0, 8)}
+            </span>
+          )}
+        </div>
       </div>
     );
   };
 
-  const renderFloor = (
-    floorKey: "firstFloor" | "secondFloor",
-    floorName: string
-  ) => {
-    const floor = seatMatrix[floorKey];
-    if (!floor) return null;
-
+  const renderFloor = (floor: SeatMatrixFloor, floorName: string) => {
     const { seats, dimensions } = floor;
     const { rows } = dimensions;
 
     // Group seats by row
     const seatsByRow: SeatPosition[][] = [];
     for (let i = 0; i < rows; i++) {
-      seatsByRow.push(seats.filter((seat: SeatPosition) => seat.row === i));
+      seatsByRow.push(seats.filter((seat) => seat.row === i));
     }
 
     return (
-      <div className="mb-8">
-        <h3 className="text-lg font-medium mb-4">{floorName}</h3>
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">{floorName}</h3>
+
         <div className="space-y-2">
-          {seatsByRow.map((rowSeats) => (
-            <div key={`row-${rowSeats[0]?.row ?? Math.random()}`} className="flex gap-2">
+          {seatsByRow.map((rowSeats, rowIndex) => (
+            <div 
+              key={`row-${rowSeats[0]?.id || `empty-${rowIndex}`}`} 
+              className="flex gap-2"
+            >
               {rowSeats.map((seat) => renderSeat(seat))}
             </div>
           ))}
@@ -94,23 +95,41 @@ export function SeatMatrixViewer({ seatMatrix }: SeatMatrixViewerProps) {
   };
 
   return (
-    <div>
-      {renderFloor("firstFloor", "Primer Piso")}
-      {hasSecondFloor && renderFloor("secondFloor", "Segundo Piso")}
+    <div className={cn("", className)}>
+      <Tabs defaultValue="firstFloor">
+        <TabsList className="mb-4">
+          <TabsTrigger value="firstFloor">Primer Piso</TabsTrigger>
+          {matrix.secondFloor && (
+            <TabsTrigger value="secondFloor">Segundo Piso</TabsTrigger>
+          )}
+        </TabsList>
 
-      <div className="mt-6 border-t pt-4">
-        <h3 className="text-lg font-medium mb-2">Leyenda</h3>
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center">
-            <div className="w-6 h-6 border border-dashed border-gray-300 rounded-md mr-2" />
+        <TabsContent value="firstFloor">
+          {renderFloor(matrix.firstFloor, "Primer Piso")}
+        </TabsContent>
+
+        {matrix.secondFloor && (
+          <TabsContent value="secondFloor">
+            {renderFloor(matrix.secondFloor, "Segundo Piso")}
+          </TabsContent>
+        )}
+      </Tabs>
+
+      <div className="mt-6 space-y-2">
+        <h4 className="text-sm font-medium">Leyenda</h4>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
+            <span className="text-sm">Asiento con tipo asignado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-red-50 border border-red-300 rounded-sm" />
+            <span className="text-sm">Asiento sin tipo asignado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-gray-100 border border-dashed border-gray-300 rounded-sm" />
             <span className="text-sm">Espacio vacío</span>
           </div>
-          {seatTiers?.map((tier: SeatTier) => (
-            <div key={tier.id} className="flex items-center">
-              <div className="w-6 h-6 bg-primary/10 border border-primary rounded-md mr-2" />
-              <span className="text-sm">{tier.name}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>

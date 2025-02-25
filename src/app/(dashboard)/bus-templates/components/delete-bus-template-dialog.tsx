@@ -23,7 +23,7 @@ export function DeleteBusTemplateDialog({
   templateId,
   onClose,
 }: DeleteBusTemplateDialogProps) {
-  const { deleteTemplate, isDeleting, fetchTemplate } = useBusTemplates();
+  const { deleteTemplate: deleteTemplateMutation, isDeleting, fetchTemplate } = useBusTemplates();
   const [templateName, setTemplateName] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +45,7 @@ export function DeleteBusTemplateDialog({
     if (!templateId) return;
     
     try {
-      await deleteTemplate(templateId);
+      await deleteTemplateMutation.mutateAsync(templateId);
       onClose();
     } catch (error) {
       setError(
