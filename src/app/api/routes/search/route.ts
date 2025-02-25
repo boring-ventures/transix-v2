@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
+import type { Prisma } from "@prisma/client";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
       );
     }
     
-    const whereClause: any = { active: true };
+    const whereClause: Prisma.RouteWhereInput = { active: true };
     
     if (query) {
       whereClause.name = { contains: query, mode: 'insensitive' as const };

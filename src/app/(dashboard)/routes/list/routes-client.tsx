@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/table/data-table";
 import { LoadingTable } from "@/components/table/loading-table";
 import { CreateRouteDialog } from "../components/create-route-dialog";
-import { EditRouteDialog } from "../components/edit-route-dialog";
 import { DeleteRouteDialog } from "../components/delete-route-dialog";
 import type { Column } from "@/components/table/types";
+import { EditRouteDialog } from "../components/edit-route-dialog";
 
 export default function RoutesClient() {
   const router = useRouter();
@@ -32,14 +32,14 @@ export default function RoutesClient() {
     {
       id: "origin",
       header: "Origen",
-      accessorKey: "origin.name",
+      accessorKey: "origin",
       cell: ({ row }) => row.origin?.name || "-",
       sortable: true,
     },
     {
       id: "destination",
       header: "Destino",
-      accessorKey: "destination.name",
+      accessorKey: "destination",
       cell: ({ row }) => row.destination?.name || "-",
       sortable: true,
     },
@@ -89,7 +89,7 @@ export default function RoutesClient() {
 
       <EditRouteDialog
         open={!!routeToEdit}
-        onOpenChange={(open) => !open && setRouteToEdit(null)}
+        onOpenChange={(open: boolean) => !open && setRouteToEdit(null)}
         route={routeToEdit}
       />
 

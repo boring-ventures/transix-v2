@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRoutes, type RouteFormData } from "@/hooks/use-routes";
-import { useLocations } from "@/hooks/use-locations";
+import { useLocations, type Location } from "@/hooks/use-locations";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-
 const formSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   originId: z.string().min(1, "Debe seleccionar un origen"),
@@ -117,8 +116,8 @@ export function CreateRouteDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Origen</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <Select
+                      onValueChange={field.onChange}
                       defaultValue={field.value}
                       disabled={isLoadingLocations}
                     >
@@ -128,7 +127,7 @@ export function CreateRouteDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {locations.map((location) => (
+                        {locations.map((location: Location) => (
                           <SelectItem key={location.id} value={location.id}>
                             {location.name}
                           </SelectItem>
@@ -146,8 +145,8 @@ export function CreateRouteDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Destino</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
+                    <Select
+                      onValueChange={field.onChange}
                       defaultValue={field.value}
                       disabled={isLoadingLocations}
                     >
@@ -157,7 +156,7 @@ export function CreateRouteDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {locations.map((location) => (
+                        {locations.map((location: Location) => (
                           <SelectItem key={location.id} value={location.id}>
                             {location.name}
                           </SelectItem>
@@ -178,11 +177,11 @@ export function CreateRouteDialog({
                   <FormItem>
                     <FormLabel>Duración Estimada (minutos)</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         min="1"
-                        placeholder="Duración en minutos" 
-                        {...field} 
+                        placeholder="Duración en minutos"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -197,7 +196,10 @@ export function CreateRouteDialog({
                   <FormItem>
                     <FormLabel>Carril de Salida</FormLabel>
                     <FormControl>
-                      <Input placeholder="Carril de salida (opcional)" {...field} />
+                      <Input
+                        placeholder="Carril de salida (opcional)"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

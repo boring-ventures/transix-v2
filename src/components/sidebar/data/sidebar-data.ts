@@ -71,7 +71,7 @@ export const sidebarData: SidebarData = {
         {
           title: "Rutas",
           url: "/routes",
-          icon: Route,
+          icon: MapIcon,
           items: [
             {
               title: "Lista de Rutas",
@@ -85,7 +85,7 @@ export const sidebarData: SidebarData = {
             },
           ],
         },
-        
+
         {
           title: "Buses",
           url: "/buses",
