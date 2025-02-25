@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { SortDirection, PaginationState, Column } from "./types";
+import type { SortDirection, PaginationState, Column } from "./types";
 import { sortData, filterData, paginateData } from "./table-utils";
 
 interface DataTableProps<TData> {
@@ -46,6 +46,10 @@ interface DataTableProps<TData> {
   onDelete?: (row: TData) => void;
   onAdd?: () => void;
   onRowClick?: (row: TData) => void;
+  customActions?: Array<{
+    label: string;
+    onClick: (row: TData) => void;
+  }>;
 }
 
 export function DataTable<TData>({
@@ -63,6 +67,7 @@ export function DataTable<TData>({
   onDelete,
   onAdd,
   onRowClick,
+  customActions,
 }: DataTableProps<TData>) {
   const [sortConfig, setSortConfig] = useState<{
     field: keyof TData | undefined;
@@ -88,8 +93,8 @@ export function DataTable<TData>({
           ? current.direction === "asc"
             ? "desc"
             : current.direction === "desc"
-            ? undefined
-            : "asc"
+              ? undefined
+              : "asc"
           : "asc",
     }));
   };
@@ -141,6 +146,25 @@ export function DataTable<TData>({
   };
 
   const totalPages = Math.ceil(processedData.totalCount / pagination.pageSize);
+
+  const getRowKey = (row: TData, index: number): string => {
+    // Use type assertion to treat row as an object with potential id/userId
+    const rowObj = row as Record<string, unknown>;
+
+    // Try to use id if available
+    if ("id" in rowObj) {
+      return String(rowObj.id);
+    }
+
+    // Try userId if available
+    if ("userId" in rowObj) {
+      return String(rowObj.userId);
+    }
+
+    // Create a stable key from stringified row data
+    const stableKey = JSON.stringify(row);
+    return `row-${stableKey.substring(0, 20)}-${index}`;
+  };
 
   return (
     <div className="space-y-4 w-full">
@@ -217,7 +241,7 @@ export function DataTable<TData>({
                         </div>
                       </TableHead>
                     ))}
-                    {(onEdit || onDelete) && (
+                    {(onEdit || onDelete || customActions) && (
                       <TableHead className="w-[100px]">Acciones</TableHead>
                     )}
                   </TableRow>
@@ -225,9 +249,9 @@ export function DataTable<TData>({
                 <TableBody>
                   {processedData.data.map((row, rowIndex) => (
                     <TableRow
-                      key={rowIndex}
+                      key={getRowKey(row, rowIndex)}
                       className={onRowClick ? "cursor-pointer" : ""}
-                      onClick={() => onRowClick && onRowClick(row)}
+                      onClick={() => onRowClick?.(row)}
                     >
                       {rowSelection && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
@@ -244,7 +268,7 @@ export function DataTable<TData>({
                             : String(row[column.accessorKey])}
                         </TableCell>
                       ))}
-                      {(onEdit || onDelete) && (
+                      {(onEdit || onDelete || customActions) && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-2">
                             {onEdit && (
@@ -267,6 +291,16 @@ export function DataTable<TData>({
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
+                            {customActions?.map((action, i) => (
+                              <Button
+                                key={`${action.label}-${i}`}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => action.onClick(row)}
+                              >
+                                {action.label}
+                              </Button>
+                            ))}
                           </div>
                         </TableCell>
                       )}

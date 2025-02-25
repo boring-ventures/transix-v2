@@ -33,3 +33,21 @@ export interface PaginationState {
   pageSize: number
 }
 
+export interface DataTableProps<TData> {
+  title: string;
+  description: string;
+  data: TData[];
+  columns: Column<TData>[];
+  searchable?: boolean;
+  searchField?: string;
+  defaultSort?: { field: string; direction: "asc" | "desc" };
+  onAdd?: () => void;
+  onEdit?: (record: TData) => void;
+  onDelete?: (record: TData) => void;
+  onRowClick?: (record: TData) => void;
+  customActions?: Array<{
+    label: string;
+    onClick: (record: TData) => void;
+  }>;
+}
+

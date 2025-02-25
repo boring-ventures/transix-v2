@@ -55,7 +55,12 @@ export function useAuth() {
       });
 
       if (error) {
-        throw error;
+        return { 
+          success: false, 
+          user: null,
+          session: null,
+          error: { message: error.message } 
+        };
       }
 
       if (data?.session) {
@@ -79,7 +84,7 @@ export function useAuth() {
         success: false,
         user: null,
         session: null,
-        error
+        error: { message: "An unexpected error occurred" }
       };
     }
   };
