@@ -58,7 +58,7 @@ export function CreateProfileDialog({
 }: CreateProfileDialogProps) {
   const { signUp } = useAuth();
   const { createProfile, isCreating } = useProfiles();
-  const { companies, isLoadingCompanies } = useCompanies();
+  const { companies, isLoadingCompanies } = useCompanies(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);

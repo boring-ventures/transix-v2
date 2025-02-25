@@ -50,7 +50,7 @@ export function useCompanies(fetchInactive = false) {
     queryKey: ["companies", { fetchInactive }],
     queryFn: async () => {
       const response = await axios.get(
-        `/api/companies${fetchInactive ? "?includeInactive=true" : ""}`
+        `/api/companies${fetchInactive ? "?includeInactive=true" : "?active=true"}`
       );
       return response.data.companies;
     },

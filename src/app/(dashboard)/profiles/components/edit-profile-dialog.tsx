@@ -57,7 +57,7 @@ export function EditProfileDialog({
   profile,
 }: EditProfileDialogProps) {
   const { updateProfile, isUpdating, assignCompany, isAssigningCompany } = useProfiles();
-  const { companies, isLoadingCompanies } = useCompanies();
+  const { companies, isLoadingCompanies } = useCompanies(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -145,8 +145,8 @@ export function EditProfileDialog({
           (data.companyId !== profile.companyId || data.branchId !== profile.branchId)) {
         await assignCompany.mutateAsync({
           id: profile.userId,
-          companyId: data.companyId || undefined,
-          branchId: data.branchId || undefined,
+          companyId: data.companyId || "",
+          branchId: data.branchId || "",
           role: data.role,
         });
       }
