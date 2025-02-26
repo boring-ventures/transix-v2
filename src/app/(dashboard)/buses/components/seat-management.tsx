@@ -207,7 +207,6 @@ export function SeatManagement({
           busId: bus.id,
           seatNumber: editedSeat.seatNumber,
           tierId: editedSeat.tierId,
-          // Only use available or maintenance as per the schema
           status: status,
           isActive: editedSeat.isActive,
           tier: undefined,
@@ -227,7 +226,35 @@ export function SeatManagement({
             seats: filteredSeats.map((s) => ({
               seatNumber: s.seatNumber,
               tierId: s.tierId,
-              // Ensure we only use valid status values from the schema
+              status: s.isActive ? "available" : "maintenance",
+              isActive: s.isActive,
+            })),
+          }),
+        });
+
+        if (!seatsResponse.ok) {
+          throw new Error("Error updating seats");
+        }
+      } else {
+        // If the seat is now empty, we need to remove it from the database
+        // Get all current seats
+        const currentSeats = [...seats];
+
+        // Filter out the current seat
+        const filteredSeats = currentSeats.filter(
+          (s) => s.seatNumber !== editedSeat.seatNumber
+        );
+
+        // Update all seats (without the removed one)
+        const seatsResponse = await fetch(`/api/buses/${bus.id}/seats`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            seats: filteredSeats.map((s) => ({
+              seatNumber: s.seatNumber,
+              tierId: s.tierId,
               status: s.isActive ? "available" : "maintenance",
               isActive: s.isActive,
             })),

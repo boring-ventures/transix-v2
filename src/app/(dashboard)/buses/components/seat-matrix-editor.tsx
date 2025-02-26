@@ -9,6 +9,8 @@ import type { BusSeat } from "@/hooks/use-bus-seats";
 import type { SeatMatrix } from "@/hooks/use-bus-templates";
 import { cn } from "@/lib/utils";
 import type { SeatStatus } from "@prisma/client";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Define an interface for the seat in the matrix
 interface MatrixSeat {
@@ -46,6 +48,7 @@ export function SeatMatrixEditor({
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<SeatStatus>("available");
+  const [setAsEmpty, setSetAsEmpty] = useState<boolean>(false);
 
   const handleSeatClick = (seatId: string) => {
     setSelectedSeats((prev) =>
@@ -135,6 +138,42 @@ export function SeatMatrixEditor({
     setSelectedSeats([]);
   };
 
+  const handleSetAsEmpty = () => {
+    if (selectedSeats.length === 0) return;
+
+    // Clone the current matrix
+    const updatedMatrix = JSON.parse(JSON.stringify(matrix));
+
+    // Update selected seats in the matrix
+    for (const seatId of selectedSeats) {
+      // Find the seat in the first floor
+      let seatFound = false;
+      const firstFloorSeat = updatedMatrix.firstFloor.seats.find(
+        (s: MatrixSeat) => s.id === seatId
+      );
+      if (firstFloorSeat) {
+        firstFloorSeat.isEmpty = setAsEmpty;
+        seatFound = true;
+      }
+
+      // If not found in first floor, check second floor
+      if (!seatFound && updatedMatrix.secondFloor) {
+        const secondFloorSeat = updatedMatrix.secondFloor.seats.find(
+          (s: MatrixSeat) => s.id === seatId
+        );
+        if (secondFloorSeat) {
+          secondFloorSeat.isEmpty = setAsEmpty;
+        }
+      }
+    }
+
+    // Update the matrix
+    onUpdate(updatedMatrix);
+
+    // Clear selection
+    setSelectedSeats([]);
+  };
+
   const prepareSeatsForUpdate = () => {
     // Start with existing seats
     return seats.map((seat) => ({
@@ -157,13 +196,16 @@ export function SeatMatrixEditor({
     // Only use available or maintenance status
     const seatStatus = busSeat?.status || "available";
     const isSelected = selectedSeats.includes(seat.id);
+    
+    // Get tier abbreviation for display (first 2 chars)
+    const tierAbbr = seatTier?.name ? seatTier.name.substring(0, 2) : "";
 
     return (
       <button
         key={seat.id}
         type="button"
         className={cn(
-          "w-10 h-10 flex items-center justify-center rounded-sm border text-xs font-medium cursor-pointer transition-colors",
+          "w-10 h-10 flex flex-col items-center justify-center rounded-sm border text-xs font-medium cursor-pointer transition-colors",
           seat.isEmpty &&
             "bg-gray-100 border-dashed border-gray-300 cursor-not-allowed",
           !seat.isEmpty &&
@@ -173,7 +215,8 @@ export function SeatMatrixEditor({
             seatTier &&
             seatStatus === "available" &&
             "bg-white border-primary text-primary hover:bg-primary/10",
-          seatStatus === "maintenance" && "bg-gray-200 border-gray-500 text-gray-700 hover:bg-gray-300",
+          seatStatus === "maintenance" &&
+            "bg-gray-200 border-gray-500 text-gray-700 hover:bg-gray-300",
           isSelected && "ring-2 ring-offset-1 ring-primary"
         )}
         title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""}`}
@@ -181,7 +224,12 @@ export function SeatMatrixEditor({
         disabled={seat.isEmpty}
         aria-pressed={isSelected}
       >
-        {!seat.isEmpty && seat.name}
+        {!seat.isEmpty && (
+          <>
+            <span className="text-[10px] font-semibold">{tierAbbr}</span>
+            <span>{seat.name}</span>
+          </>
+        )}
       </button>
     );
   };
@@ -217,11 +265,26 @@ export function SeatMatrixEditor({
     <div className="space-y-6">
       <div className="flex flex-wrap gap-4 items-center">
         <div>
+          <h3 className="text-sm font-medium mb-2">Espacio Vacío</h3>
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={setAsEmpty}
+              onCheckedChange={setSetAsEmpty}
+              id="empty-space"
+            />
+            <Label htmlFor="empty-space">
+              {setAsEmpty ? "Marcar como vacío" : "Marcar como asiento"}
+            </Label>
+          </div>
+        </div>
+
+        <div>
           <h3 className="text-sm font-medium mb-2">Tipo de Asiento</h3>
           <select
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={selectedTier || ""}
             onChange={(e) => setSelectedTier(e.target.value || null)}
+            disabled={setAsEmpty}
           >
             <option value="">Seleccionar tipo</option>
             {seatTiers.map((tier) => (
@@ -238,6 +301,7 @@ export function SeatMatrixEditor({
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value as SeatStatus)}
+            disabled={setAsEmpty}
           >
             <option value="available">Disponible</option>
             <option value="maintenance">Mantenimiento</option>
@@ -246,15 +310,29 @@ export function SeatMatrixEditor({
 
         <div className="flex flex-col space-y-2 mt-6">
           <Button
+            onClick={handleSetAsEmpty}
+            disabled={selectedSeats.length === 0 || isUpdating}
+            size="sm"
+            variant="secondary"
+          >
+            {setAsEmpty ? "Marcar como Vacío" : "Marcar como Asiento"}
+          </Button>
+
+          <Button
             onClick={handleApplyTier}
-            disabled={!selectedTier || selectedSeats.length === 0 || isUpdating}
+            disabled={
+              !selectedTier ||
+              selectedSeats.length === 0 ||
+              isUpdating ||
+              setAsEmpty
+            }
             size="sm"
           >
             Aplicar Tipo
           </Button>
           <Button
             onClick={handleApplyStatus}
-            disabled={selectedSeats.length === 0 || isUpdating}
+            disabled={selectedSeats.length === 0 || isUpdating || setAsEmpty}
             size="sm"
             variant="outline"
           >
@@ -311,10 +389,12 @@ export function SeatMatrixEditor({
       <div className="mt-6 space-y-2">
         <h4 className="text-sm font-medium">Leyenda</h4>
         <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
-            <span className="text-sm">Disponible</span>
-          </div>
+          {seatTiers.map((tier) => (
+            <div key={tier.id} className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
+              <span className="text-sm">{tier.name}</span>
+            </div>
+          ))}
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-gray-200 border border-gray-500 rounded-sm" />
             <span className="text-sm">Mantenimiento</span>

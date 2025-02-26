@@ -40,16 +40,14 @@ export function SeatMatrixViewer({
     // Use the SeatStatus type properly
     const seatStatus = (busSeat?.status || "available") as SeatStatus;
 
-    // For debugging
-    if (seatStatus === "maintenance") {
-      console.log(`Seat ${seat.name} has maintenance status`);
-    }
+    // Get tier abbreviation for display (first 2 chars)
+    const tierAbbr = seatTier?.name ? seatTier.name.substring(0, 2) : "";
 
     return (
       <div
         key={seat.id}
         className={cn(
-          "w-10 h-10 flex items-center justify-center rounded-sm border text-xs font-medium",
+          "w-10 h-10 flex flex-col items-center justify-center rounded-sm border text-xs font-medium relative",
           seat.isEmpty && "bg-gray-100 border-dashed border-gray-300",
           !seat.isEmpty && !seatTier && "bg-red-50 border-red-300 text-red-700",
           !seat.isEmpty &&
@@ -61,7 +59,12 @@ export function SeatMatrixViewer({
         )}
         title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""} (${seatStatus})`}
       >
-        {!seat.isEmpty && seat.name}
+        {!seat.isEmpty && (
+          <>
+            <span className="text-[10px] font-semibold">{tierAbbr}</span>
+            <span>{seat.name}</span>
+          </>
+        )}
       </div>
     );
   };
@@ -114,10 +117,12 @@ export function SeatMatrixViewer({
       <div className="mt-6 space-y-2">
         <h4 className="text-sm font-medium">Leyenda</h4>
         <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
-            <span className="text-sm">Disponible</span>
-          </div>
+          {seatTiers.map((tier) => (
+            <div key={tier.id} className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
+              <span className="text-sm">{tier.name}</span>
+            </div>
+          ))}
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-gray-200 border border-gray-500 rounded-sm" />
             <span className="text-sm">Mantenimiento</span>
