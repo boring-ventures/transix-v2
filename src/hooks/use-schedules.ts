@@ -256,8 +256,13 @@ export function useSchedules({
 
   // Fetch a single schedule by ID
   const fetchSchedule = useCallback(async (id: string) => {
-    const response = await axios.get(`/api/schedules/${id}`);
-    return response.data.schedule;
+    try {
+      const response = await axios.get(`/api/schedules/${id}?include=route,bus,primaryDriver,secondaryDriver,tickets,parcels,logs`);
+      return response.data.schedule;
+    } catch (error) {
+      console.error("Error fetching schedule:", error);
+      throw error;
+    }
   }, []);
 
   // Create a new schedule
@@ -324,12 +329,12 @@ export function useSchedules({
   const updateScheduleStatus = useMutation({
     mutationFn: async ({
       id,
-      data,
+      status,
     }: {
       id: string;
-      data: ScheduleStatusUpdate;
+      status: ScheduleStatus;
     }) => {
-      const response = await axios.patch(`/api/schedules/${id}/status`, data);
+      const response = await axios.patch(`/api/schedules/${id}/status`, { status });
       return response.data.schedule;
     },
     onSuccess: () => {
@@ -340,6 +345,7 @@ export function useSchedules({
       });
     },
     onError: (error) => {
+      console.error("Error updating schedule status:", error);
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.error
           ? error.response.data.error

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useSchedules, type ScheduleFormData } from "@/hooks/use-schedules";
+import { useSchedules, type Schedule } from "@/hooks/use-schedules";
 import { type Bus, useBuses } from "@/hooks/use-buses";
 import { type Driver, useDrivers } from "@/hooks/use-drivers";
-import { useRouteSchedules, type RouteSchedule } from "@/hooks/use-route-schedules";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +44,6 @@ import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
-  routeScheduleId: z.string().optional(),
   busId: z.string().min(1, "Debe seleccionar un bus"),
   primaryDriverId: z.string().min(1, "Debe seleccionar un conductor principal"),
   secondaryDriverId: z.string().optional(),
@@ -58,109 +56,61 @@ const formSchema = z.object({
   price: z.coerce.number().min(0, "El precio no puede ser negativo"),
 });
 
-type CreateScheduleFormValues = z.infer<typeof formSchema>;
+type EditScheduleFormValues = z.infer<typeof formSchema>;
 
-interface CreateScheduleDialogProps {
+interface EditScheduleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  routeId: string;
+  schedule: Schedule;
+  onUpdate: (schedule: Schedule) => void;
 }
 
-export function CreateScheduleDialog({
+export function EditScheduleDialog({
   open,
   onOpenChange,
-  routeId,
-}: CreateScheduleDialogProps) {
-  const { createSchedule, isCreating } = useSchedules();
+  schedule,
+  onUpdate,
+}: EditScheduleDialogProps) {
+  const { updateSchedule, isUpdating } = useSchedules();
   const { buses, isLoadingBuses } = useBuses(true);
   const { drivers, isLoadingDrivers } = useDrivers(true);
-  const { routeSchedules, isLoadingRouteSchedules } = useRouteSchedules({
-    routeId,
-  });
   const [error, setError] = useState<string | null>(null);
 
-  const form = useForm<CreateScheduleFormValues>({
+  const form = useForm<EditScheduleFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      routeScheduleId: "none",
-      busId: "",
-      primaryDriverId: "",
-      secondaryDriverId: "none",
-      price: 0,
+      busId: schedule.busId || "",
+      primaryDriverId: schedule.primaryDriverId || "",
+      secondaryDriverId: schedule.secondaryDriverId || "none",
+      departureDate: new Date(schedule.departureDate),
+      estimatedArrivalTime: new Date(schedule.estimatedArrivalTime),
+      price: schedule.price,
     },
   });
 
-  // Reset form when dialog opens/closes
-  useEffect(() => {
-    if (open) {
-      form.reset({
-        routeScheduleId: "none",
-        busId: "",
-        primaryDriverId: "",
-        secondaryDriverId: "none",
-        price: 0,
-      });
-    }
-  }, [open, form]);
-
-  // Update estimated arrival time when route schedule changes
-  useEffect(() => {
-    const routeScheduleId = form.watch("routeScheduleId");
-    const departureDate = form.watch("departureDate");
-
-    if (routeScheduleId && routeScheduleId !== "none" && departureDate) {
-      const routeSchedule = routeSchedules.find(
-        (rs: RouteSchedule) => rs.id === routeScheduleId
-      );
-
-      if (routeSchedule?.route) {
-        // Get the departure time from the selected route schedule
-        const scheduleDepartureTime = new Date(routeSchedule.departureTime);
-
-        // Create a new date with the selected departure date but time from the route schedule
-        const newDepartureDate = new Date(departureDate);
-        newDepartureDate.setHours(
-          scheduleDepartureTime.getHours(),
-          scheduleDepartureTime.getMinutes()
-        );
-
-        // Update the departure date with the time from the schedule
-        form.setValue("departureDate", newDepartureDate);
-
-        // Calculate estimated arrival time based on departure time and route duration
-        const estimatedArrivalTime = addMinutes(
-          newDepartureDate,
-          routeSchedule.route.estimatedDuration
-        );
-
-        form.setValue("estimatedArrivalTime", estimatedArrivalTime);
-      }
-    }
-  }, [routeSchedules, form]);
-
-  const onSubmit = async (data: CreateScheduleFormValues) => {
+  const onSubmit = async (data: EditScheduleFormValues) => {
     setError(null);
     
     try {
-      const scheduleData: ScheduleFormData = {
-        routeId,
-        busId: data.busId,
-        routeScheduleId: data.routeScheduleId === "none" ? undefined : data.routeScheduleId,
-        primaryDriverId: data.primaryDriverId,
-        secondaryDriverId:
-          data.secondaryDriverId === "none"
-            ? undefined
-            : data.secondaryDriverId,
-        departureDate: data.departureDate.toISOString(),
-        estimatedArrivalTime: data.estimatedArrivalTime.toISOString(),
-        price: data.price,
-      };
-
-      await createSchedule.mutateAsync(scheduleData);
-      form.reset();
+      const updatedSchedule = await updateSchedule.mutateAsync({
+        id: schedule.id,
+        data: {
+          busId: data.busId,
+          primaryDriverId: data.primaryDriverId,
+          secondaryDriverId:
+            data.secondaryDriverId === "none"
+              ? undefined
+              : data.secondaryDriverId,
+          departureDate: data.departureDate.toISOString(),
+          estimatedArrivalTime: data.estimatedArrivalTime.toISOString(),
+          price: data.price,
+        },
+      });
+      
+      onUpdate(updatedSchedule);
       onOpenChange(false);
     } catch {
-      setError("Error al crear el viaje. Por favor, inténtelo de nuevo.");
+      setError("Error al actualizar el viaje. Por favor, inténtelo de nuevo.");
     }
   };
 
@@ -168,96 +118,13 @@ export function CreateScheduleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Programar Nuevo Viaje</DialogTitle>
+          <DialogTitle>Editar Viaje</DialogTitle>
           <DialogDescription>
-            Complete la información para programar un nuevo viaje en esta ruta.
+            Modifique la información del viaje programado.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="routeScheduleId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Horario de Ruta (Opcional)</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={isLoadingRouteSchedules}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar horario (opcional)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Ninguno</SelectItem>
-                      {routeSchedules.map((routeSchedule: RouteSchedule) => {
-                        // Format operating days for better display
-                        const daysMap = {
-                          "0": "Dom",
-                          "1": "Lun",
-                          "2": "Mar",
-                          "3": "Mié",
-                          "4": "Jue",
-                          "5": "Vie",
-                          "6": "Sáb",
-                        };
-
-                        const days = routeSchedule.operatingDays
-                          .split(",")
-                          .map((day) => daysMap[day as keyof typeof daysMap])
-                          .join(", ");
-
-                        // Format departure and arrival times
-                        const departureTime = format(
-                          new Date(routeSchedule.departureTime),
-                          "HH:mm"
-                        );
-                        const arrivalTime = format(
-                          new Date(routeSchedule.estimatedArrivalTime),
-                          "HH:mm"
-                        );
-
-                        // Create a more descriptive label
-                        const scheduleLabel = `${departureTime} - ${arrivalTime} | ${days}`;
-
-                        return (
-                          <SelectItem
-                            key={routeSchedule.id}
-                            value={routeSchedule.id}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">
-                                {scheduleLabel}
-                              </span>
-                              {routeSchedule.seasonStart &&
-                                routeSchedule.seasonEnd && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Temporada:{" "}
-                                    {format(
-                                      new Date(routeSchedule.seasonStart),
-                                      "dd/MM/yyyy"
-                                    )}{" "}
-                                    -{" "}
-                                    {format(
-                                      new Date(routeSchedule.seasonEnd),
-                                      "dd/MM/yyyy"
-                                    )}
-                                  </span>
-                                )}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -330,29 +197,6 @@ export function CreateScheduleDialog({
                                 Number.parseInt(minutes)
                               );
                               field.onChange(newDate);
-
-                              // If a route schedule is selected, update the estimated arrival time
-                              const routeScheduleId =
-                                form.getValues("routeScheduleId");
-                              if (
-                                routeScheduleId &&
-                                routeScheduleId !== "none"
-                              ) {
-                                const routeSchedule = routeSchedules.find(
-                                  (rs: RouteSchedule) =>
-                                    rs.id === routeScheduleId
-                                );
-                                if (routeSchedule?.route) {
-                                  const estimatedArrivalTime = addMinutes(
-                                    newDate,
-                                    routeSchedule.route.estimatedDuration
-                                  );
-                                  form.setValue(
-                                    "estimatedArrivalTime",
-                                    estimatedArrivalTime
-                                  );
-                                }
-                              }
                             }}
                           />
                         </div>
@@ -591,15 +435,15 @@ export function CreateScheduleDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={isCreating}
+                disabled={isUpdating}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isCreating}>
-                {isCreating && (
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Programar Viaje
+                Guardar Cambios
               </Button>
             </DialogFooter>
           </form>

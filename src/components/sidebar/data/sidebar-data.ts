@@ -59,12 +59,12 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Viajes",
-          url: "/trips",
+          url: "/schedules",
           icon: Bus,
           items: [
             {
               title: "Lista de Viajes",
-              url: "/trips/list",
+              url: "/schedules",
               icon: List,
             },
           ],

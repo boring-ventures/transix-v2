@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { BusSeat } from "@prisma/client";
 
 // Get all seats for a specific bus
 export async function GET(
@@ -73,7 +74,7 @@ export async function POST(
 
     // Create new seats
     const createdSeats = await prisma.busSeat.createMany({
-      data: seats.map((seat: any) => {
+      data: seats.map((seat: BusSeat) => {
         // Ensure we're using valid status values
         const status = seat.isActive ? "available" : "maintenance";
         

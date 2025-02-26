@@ -1,11 +1,24 @@
 import { NextResponse } from "next/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, ScheduleStatus } from "@prisma/client";
 
 // Get all schedules with optional filtering
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(request.url);
+    // Get the Supabase client
+    const supabase = createRouteHandlerClient({ cookies });
+
+    // Check authentication
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
     const routeId = searchParams.get("routeId");
     const busId = searchParams.get("busId");
     const status = searchParams.get("status");
@@ -15,66 +28,45 @@ export async function GET(request: Request) {
     const toDate = searchParams.get("toDate");
     const routeScheduleId = searchParams.get("routeScheduleId");
 
-    // Build where clause
+    // Build the query
     const whereClause: Prisma.ScheduleWhereInput = {};
 
-    if (routeId) whereClause.routeId = routeId;
+    if (routeId) {
+      whereClause.routeSchedule = {
+        routeId,
+      };
+    }
+
     if (busId) whereClause.busId = busId;
     if (status) whereClause.status = status as ScheduleStatus;
     if (primaryDriverId) whereClause.primaryDriverId = primaryDriverId;
     if (secondaryDriverId) whereClause.secondaryDriverId = secondaryDriverId;
     if (routeScheduleId) whereClause.routeScheduleId = routeScheduleId;
 
-    // Handle date range filtering
-    if (fromDate || toDate) {
-      whereClause.departureDate = {};
-
-      if (fromDate) {
-        whereClause.departureDate.gte = new Date(fromDate);
-      }
-
-      if (toDate) {
-        whereClause.departureDate.lte = new Date(toDate);
-      }
+    if (fromDate) {
+      whereClause.departureDate = {
+        ...(whereClause.departureDate as Prisma.DateTimeFilter),
+        gte: new Date(fromDate),
+      };
     }
 
-    // Get schedules
+    if (toDate) {
+      whereClause.departureDate = {
+        ...(whereClause.departureDate as Prisma.DateTimeFilter),
+        lte: new Date(toDate),
+      };
+    }
+
+    // Fetch schedules
     const schedules = await prisma.schedule.findMany({
       where: whereClause,
       include: {
-        bus: {
-          select: {
-            id: true,
-            plateNumber: true,
-            template: {
-              select: {
-                id: true,
-                name: true,
-                type: true,
-              },
-            },
-          },
-        },
+        bus: true,
+        primaryDriver: true,
+        secondaryDriver: true,
         routeSchedule: {
           include: {
-            route: {
-              include: {
-                origin: true,
-                destination: true,
-              },
-            },
-          },
-        },
-        primaryDriver: {
-          select: {
-            id: true,
-            fullName: true,
-          },
-        },
-        secondaryDriver: {
-          select: {
-            id: true,
-            fullName: true,
+            route: true,
           },
         },
         _count: {
@@ -85,7 +77,7 @@ export async function GET(request: Request) {
         },
       },
       orderBy: {
-        departureDate: "asc",
+        departureDate: "desc",
       },
     });
 
@@ -93,365 +85,72 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Error fetching schedules:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Error al obtener los viajes programados" },
       { status: 500 }
     );
   }
 }
 
 // Create a new schedule
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const json = await request.json();
+    // Get the Supabase client
+    const supabase = createRouteHandlerClient({ cookies });
+
+    // Check authentication
     const {
-      routeId,
-      routeScheduleId,
-      busId,
-      departureDate,
-      estimatedArrivalTime,
-      price,
-      status,
-      primaryDriverId,
-      secondaryDriverId,
-    } = json;
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const data = await req.json();
 
     // Validate required fields
     if (
-      !routeId ||
-      !routeScheduleId ||
-      !busId ||
-      !departureDate ||
-      !estimatedArrivalTime ||
-      price === undefined
+      !data.routeScheduleId ||
+      !data.busId ||
+      !data.primaryDriverId ||
+      !data.departureDate
     ) {
       return NextResponse.json(
-        { error: "Missing required schedule information" },
+        { error: "Faltan campos requeridos para crear el viaje" },
         { status: 400 }
       );
-    }
-
-    // Check if route exists
-    const route = await prisma.route.findUnique({
-      where: { id: routeId },
-    });
-
-    if (!route) {
-      return NextResponse.json({ error: "Route not found" }, { status: 404 });
-    }
-
-    // Check if route schedule exists
-    const routeSchedule = await prisma.routeSchedule.findUnique({
-      where: { id: routeScheduleId },
-    });
-
-    if (!routeSchedule) {
-      return NextResponse.json(
-        { error: "Route schedule not found" },
-        { status: 404 }
-      );
-    }
-
-    // Check if bus exists
-    const bus = await prisma.bus.findUnique({
-      where: { id: busId },
-    });
-
-    if (!bus) {
-      return NextResponse.json({ error: "Bus not found" }, { status: 404 });
-    }
-
-    // Check if bus is active and not in maintenance
-    if (!bus.isActive || bus.maintenanceStatus !== "active") {
-      return NextResponse.json(
-        { error: "Bus is not active or is under maintenance" },
-        { status: 400 }
-      );
-    }
-
-    // Check if primary driver exists if provided
-    if (primaryDriverId) {
-      const primaryDriver = await prisma.driver.findUnique({
-        where: { id: primaryDriverId },
-      });
-
-      if (!primaryDriver) {
-        return NextResponse.json(
-          { error: "Primary driver not found" },
-          { status: 404 }
-        );
-      }
-
-      if (!primaryDriver.active) {
-        return NextResponse.json(
-          { error: "Primary driver is not active" },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Check if secondary driver exists if provided
-    if (secondaryDriverId) {
-      const secondaryDriver = await prisma.driver.findUnique({
-        where: { id: secondaryDriverId },
-      });
-
-      if (!secondaryDriver) {
-        return NextResponse.json(
-          { error: "Secondary driver not found" },
-          { status: 404 }
-        );
-      }
-
-      if (!secondaryDriver.active) {
-        return NextResponse.json(
-          { error: "Secondary driver is not active" },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Check if bus is already assigned to another schedule at the same time
-    const overlappingSchedule = await prisma.schedule.findFirst({
-      where: {
-        busId,
-        OR: [
-          {
-            departureDate: {
-              lte: new Date(departureDate),
-            },
-            estimatedArrivalTime: {
-              gte: new Date(departureDate),
-            },
-          },
-          {
-            departureDate: {
-              lte: new Date(estimatedArrivalTime),
-            },
-            estimatedArrivalTime: {
-              gte: new Date(estimatedArrivalTime),
-            },
-          },
-          {
-            departureDate: {
-              gte: new Date(departureDate),
-            },
-            estimatedArrivalTime: {
-              lte: new Date(estimatedArrivalTime),
-            },
-          },
-        ],
-        status: {
-          in: ["scheduled", "in_progress"],
-        },
-      },
-    });
-
-    if (overlappingSchedule) {
-      return NextResponse.json(
-        {
-          error:
-            "Bus is already assigned to another schedule during this time period",
-        },
-        { status: 409 }
-      );
-    }
-
-    // Check if primary driver is already assigned to another schedule at the same time
-    if (primaryDriverId) {
-      const overlappingPrimaryDriverSchedule = await prisma.schedule.findFirst({
-        where: {
-          OR: [
-            {
-              primaryDriverId,
-              OR: [
-                {
-                  departureDate: {
-                    lte: new Date(departureDate),
-                  },
-                  estimatedArrivalTime: {
-                    gte: new Date(departureDate),
-                  },
-                },
-                {
-                  departureDate: {
-                    lte: new Date(estimatedArrivalTime),
-                  },
-                  estimatedArrivalTime: {
-                    gte: new Date(estimatedArrivalTime),
-                  },
-                },
-                {
-                  departureDate: {
-                    gte: new Date(departureDate),
-                  },
-                  estimatedArrivalTime: {
-                    lte: new Date(estimatedArrivalTime),
-                  },
-                },
-              ],
-            },
-            {
-              secondaryDriverId: primaryDriverId,
-              OR: [
-                {
-                  departureDate: {
-                    lte: new Date(departureDate),
-                  },
-                  estimatedArrivalTime: {
-                    gte: new Date(departureDate),
-                  },
-                },
-                {
-                  departureDate: {
-                    lte: new Date(estimatedArrivalTime),
-                  },
-                  estimatedArrivalTime: {
-                    gte: new Date(estimatedArrivalTime),
-                  },
-                },
-                {
-                  departureDate: {
-                    gte: new Date(departureDate),
-                  },
-                  estimatedArrivalTime: {
-                    lte: new Date(estimatedArrivalTime),
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      });
-
-      if (overlappingPrimaryDriverSchedule) {
-        return NextResponse.json(
-          {
-            error:
-              "Primary driver is already assigned to another schedule during this time period",
-          },
-          { status: 409 }
-        );
-      }
-    }
-
-    // Check if secondary driver is already assigned to another schedule at the same time
-    if (secondaryDriverId) {
-      const overlappingSecondaryDriverSchedule =
-        await prisma.schedule.findFirst({
-          where: {
-            OR: [
-              {
-                primaryDriverId: secondaryDriverId,
-                OR: [
-                  {
-                    departureDate: {
-                      lte: new Date(departureDate),
-                    },
-                    estimatedArrivalTime: {
-                      gte: new Date(departureDate),
-                    },
-                  },
-                  {
-                    departureDate: {
-                      lte: new Date(estimatedArrivalTime),
-                    },
-                    estimatedArrivalTime: {
-                      gte: new Date(estimatedArrivalTime),
-                    },
-                  },
-                  {
-                    departureDate: {
-                      gte: new Date(departureDate),
-                    },
-                    estimatedArrivalTime: {
-                      lte: new Date(estimatedArrivalTime),
-                    },
-                  },
-                ],
-              },
-              {
-                secondaryDriverId,
-                OR: [
-                  {
-                    departureDate: {
-                      lte: new Date(departureDate),
-                    },
-                    estimatedArrivalTime: {
-                      gte: new Date(departureDate),
-                    },
-                  },
-                  {
-                    departureDate: {
-                      lte: new Date(estimatedArrivalTime),
-                    },
-                    estimatedArrivalTime: {
-                      gte: new Date(estimatedArrivalTime),
-                    },
-                  },
-                  {
-                    departureDate: {
-                      gte: new Date(departureDate),
-                    },
-                    estimatedArrivalTime: {
-                      lte: new Date(estimatedArrivalTime),
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        });
-
-      if (overlappingSecondaryDriverSchedule) {
-        return NextResponse.json(
-          {
-            error:
-              "Secondary driver is already assigned to another schedule during this time period",
-          },
-          { status: 409 }
-        );
-      }
     }
 
     // Create schedule
     const schedule = await prisma.schedule.create({
       data: {
-        routeId,
-        routeScheduleId,
-        busId,
-        departureDate: new Date(departureDate),
-        estimatedArrivalTime: new Date(estimatedArrivalTime),
-        price,
-        status: status || "scheduled",
-        primaryDriverId,
-        secondaryDriverId,
+        routeScheduleId: data.routeScheduleId,
+        busId: data.busId,
+        primaryDriverId: data.primaryDriverId,
+        secondaryDriverId: data.secondaryDriverId,
+        departureDate: new Date(data.departureDate),
+        estimatedArrivalTime: new Date(data.estimatedArrivalTime),
+        price: data.price || 0,
+        status: "scheduled",
       },
       include: {
         bus: true,
-        routeSchedule: {
-          include: {
-            route: {
-              include: {
-                origin: true,
-                destination: true,
-              },
-            },
-          },
-        },
         primaryDriver: true,
         secondaryDriver: true,
+        routeSchedule: {
+          include: {
+            route: true,
+          },
+        },
       },
     });
 
-    // Create bus assignment
-    await prisma.busAssignment.create({
+    // Create a log entry for this new schedule
+    await prisma.busLog.create({
       data: {
-        busId,
-        routeId,
         scheduleId: schedule.id,
-        startTime: new Date(departureDate),
-        endTime: new Date(estimatedArrivalTime),
-        status: "active",
+        type: "SCHEDULE_CREATED",
+        notes: "Nuevo viaje creado",
+        profileId: session.user.id,
       },
     });
 
@@ -459,7 +158,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating schedule:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Error al crear el viaje programado" },
       { status: 500 }
     );
   }
