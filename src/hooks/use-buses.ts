@@ -49,21 +49,20 @@ export function useBuses(isActive?: boolean) {
     error: busesError,
     refetch: refetchBuses,
   } = useQuery({
-    queryKey: ["buses", { activeParam }],
+    queryKey: ["buses", { isActive }],
     queryFn: async () => {
       let url = "/api/buses";
       const params = new URLSearchParams();
 
-      if (activeParam) params.append("isActive", activeParam);
+      if (isActive !== undefined) params.append("isActive", isActive.toString());
 
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
 
       const response = await axios.get(url);
-      return response.data.buses;
+      return response.data.buses || [];
     },
-    enabled: !!activeParam || activeParam === undefined, // Only fetch if activeParam is provided or explicitly undefined
   });
 
   // Fetch a single bus by ID
