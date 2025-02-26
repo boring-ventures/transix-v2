@@ -45,7 +45,7 @@ export function SeatMatrixEditor({
 }: SeatMatrixEditorProps) {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string>("available");
+  const [selectedStatus, setSelectedStatus] = useState<SeatStatus>("available");
 
   const handleSeatClick = (seatId: string) => {
     setSelectedSeats((prev) =>
@@ -78,7 +78,7 @@ export function SeatMatrixEditor({
           updatedSeats.push({
             seatNumber: seat.name,
             tierId: selectedTier,
-            status: selectedStatus as SeatStatus,
+            status: selectedStatus,
             isActive: true,
           });
         }
@@ -110,7 +110,7 @@ export function SeatMatrixEditor({
         );
 
         if (existingSeat) {
-          existingSeat.status = selectedStatus as SeatStatus;
+          existingSeat.status = selectedStatus;
         } else {
           // If no tier is assigned, we can't create a seat
           const seatTier = seats.find(
@@ -120,7 +120,7 @@ export function SeatMatrixEditor({
             updatedSeats.push({
               seatNumber: seat.name,
               tierId: seatTier,
-              status: selectedStatus as SeatStatus,
+              status: selectedStatus,
               isActive: true,
             });
           }
@@ -154,7 +154,8 @@ export function SeatMatrixEditor({
       busSeat ? tier.id === busSeat.tierId : tier.id === seat.tierId
     );
 
-    const seatStatus = (busSeat?.status || "available") as SeatStatus;
+    // Only use available or maintenance status
+    const seatStatus = busSeat?.status || "available";
     const isSelected = selectedSeats.includes(seat.id);
 
     return (
@@ -170,10 +171,9 @@ export function SeatMatrixEditor({
             "bg-red-50 border-red-300 text-red-700 hover:bg-red-100",
           !seat.isEmpty &&
             seatTier &&
+            seatStatus === "available" &&
             "bg-white border-primary text-primary hover:bg-primary/10",
-          seatStatus === ("reserved" as SeatStatus) && "bg-yellow-100 border-yellow-400 text-yellow-700 hover:bg-yellow-200",
-          seatStatus === ("occupied" as SeatStatus) && "bg-red-100 border-red-400 text-red-700 hover:bg-red-200",
-          seatStatus === ("maintenance" as SeatStatus) && "bg-gray-200 border-gray-500 text-gray-700 hover:bg-gray-300",
+          seatStatus === "maintenance" && "bg-gray-200 border-gray-500 text-gray-700 hover:bg-gray-300",
           isSelected && "ring-2 ring-offset-1 ring-primary"
         )}
         title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""}`}
@@ -237,11 +237,9 @@ export function SeatMatrixEditor({
           <select
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={(e) => setSelectedStatus(e.target.value as SeatStatus)}
           >
             <option value="available">Disponible</option>
-            <option value="reserved">Reservado</option>
-            <option value="occupied">Ocupado</option>
             <option value="maintenance">Mantenimiento</option>
           </select>
         </div>
@@ -316,14 +314,6 @@ export function SeatMatrixEditor({
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
             <span className="text-sm">Disponible</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-100 border border-yellow-400 rounded-sm" />
-            <span className="text-sm">Reservado</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-100 border border-red-400 rounded-sm" />
-            <span className="text-sm">Ocupado</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-gray-200 border border-gray-500 rounded-sm" />

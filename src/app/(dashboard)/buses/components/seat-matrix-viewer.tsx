@@ -37,7 +37,8 @@ export function SeatMatrixViewer({
       busSeat ? tier.id === busSeat.tierId : tier.id === seat.tierId
     );
     
-    const seatStatus = (busSeat?.status || "available") as SeatStatus;
+    // Only use available or maintenance status
+    const seatStatus = busSeat?.status || "available";
     
     return (
       <div
@@ -46,10 +47,8 @@ export function SeatMatrixViewer({
           "w-10 h-10 flex items-center justify-center rounded-sm border text-xs font-medium",
           seat.isEmpty && "bg-gray-100 border-dashed border-gray-300",
           !seat.isEmpty && !seatTier && "bg-red-50 border-red-300 text-red-700",
-          !seat.isEmpty && seatTier && "bg-white border-primary text-primary",
-          seatStatus === ("reserved" as SeatStatus) && "bg-yellow-100 border-yellow-400 text-yellow-700",
-          seatStatus === ("occupied" as SeatStatus) && "bg-red-100 border-red-400 text-red-700",
-          seatStatus === ("maintenance" as SeatStatus) && "bg-gray-200 border-gray-500 text-gray-700",
+          !seat.isEmpty && seatTier && seatStatus === "available" && "bg-white border-primary text-primary",
+          seatStatus === "maintenance" && "bg-gray-200 border-gray-500 text-gray-700",
         )}
         title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ''}`}
       >
@@ -109,14 +108,6 @@ export function SeatMatrixViewer({
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
             <span className="text-sm">Disponible</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-100 border border-yellow-400 rounded-sm" />
-            <span className="text-sm">Reservado</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-100 border border-red-400 rounded-sm" />
-            <span className="text-sm">Ocupado</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-gray-200 border border-gray-500 rounded-sm" />
