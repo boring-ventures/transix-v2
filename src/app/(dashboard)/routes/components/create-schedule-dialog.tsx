@@ -82,10 +82,10 @@ export function CreateScheduleDialog({
   const form = useForm<CreateScheduleFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      routeScheduleId: "",
+      routeScheduleId: "none",
       busId: "",
       primaryDriverId: "",
-      secondaryDriverId: "",
+      secondaryDriverId: "none",
       price: 0,
     },
   });
@@ -94,10 +94,10 @@ export function CreateScheduleDialog({
   useEffect(() => {
     if (open) {
       form.reset({
-        routeScheduleId: "",
+        routeScheduleId: "none",
         busId: "",
         primaryDriverId: "",
-        secondaryDriverId: "",
+        secondaryDriverId: "none",
         price: 0,
       });
     }
@@ -132,7 +132,7 @@ export function CreateScheduleDialog({
       const scheduleData: ScheduleFormData = {
         routeId,
         busId: data.busId,
-        routeScheduleId: data.routeScheduleId,
+        routeScheduleId: data.routeScheduleId === "none" ? undefined : data.routeScheduleId,
         primaryDriverId: data.primaryDriverId,
         secondaryDriverId:
           data.secondaryDriverId === "none"
@@ -179,21 +179,46 @@ export function CreateScheduleDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Ninguno</SelectItem>
-                      {routeSchedules.map((routeSchedule: RouteSchedule) => (
-                        <SelectItem
-                          key={routeSchedule.id}
-                          value={routeSchedule.id}
-                        >
-                          {`${format(new Date(routeSchedule.departureTime), "HH:mm")} - ${
-                            ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][
-                              Number.parseInt(
-                                routeSchedule.operatingDays.split(",")[0]
-                              )
-                            ]
-                          }`}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="none">Ninguno</SelectItem>
+                      {routeSchedules.map((routeSchedule: RouteSchedule) => {
+                        // Format operating days for better display
+                        const daysMap = {
+                          "0": "Dom",
+                          "1": "Lun",
+                          "2": "Mar",
+                          "3": "Mié",
+                          "4": "Jue",
+                          "5": "Vie",
+                          "6": "Sáb"
+                        };
+                        
+                        const days = routeSchedule.operatingDays.split(",")
+                          .map(day => daysMap[day as keyof typeof daysMap])
+                          .join(", ");
+                        
+                        // Format departure and arrival times
+                        const departureTime = format(new Date(routeSchedule.departureTime), "HH:mm");
+                        const arrivalTime = format(new Date(routeSchedule.estimatedArrivalTime), "HH:mm");
+                        
+                        // Create a more descriptive label
+                        const scheduleLabel = `${departureTime} - ${arrivalTime} | ${days}`;
+                        
+                        return (
+                          <SelectItem
+                            key={routeSchedule.id}
+                            value={routeSchedule.id}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{scheduleLabel}</span>
+                              {routeSchedule.seasonStart && routeSchedule.seasonEnd && (
+                                <span className="text-xs text-muted-foreground">
+                                  Temporada: {format(new Date(routeSchedule.seasonStart), "dd/MM/yyyy")} - {format(new Date(routeSchedule.seasonEnd), "dd/MM/yyyy")}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <FormMessage />

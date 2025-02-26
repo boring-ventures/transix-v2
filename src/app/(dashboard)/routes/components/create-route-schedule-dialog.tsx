@@ -35,8 +35,19 @@ import { es } from "date-fns/locale";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Define days of the week for checkboxes
+const daysOfWeek = [
+  { id: "0", label: "Domingo" },
+  { id: "1", label: "Lunes" },
+  { id: "2", label: "Martes" },
+  { id: "3", label: "Miércoles" },
+  { id: "4", label: "Jueves" },
+  { id: "5", label: "Viernes" },
+  { id: "6", label: "Sábado" },
+];
+
 const formSchema = z.object({
-  operatingDays: z.string().min(1, "Debe seleccionar al menos un día"),
+  operatingDays: z.array(z.string()).min(1, "Debe seleccionar al menos un día"),
   departureTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, {
     message: "Formato de hora inválido. Use HH:MM (24h)",
   }),
@@ -70,7 +81,7 @@ export function CreateRouteScheduleDialog({
   const form = useForm<RouteScheduleFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      operatingDays: "1,2,3,4,5", // Monday to Friday
+      operatingDays: ["1", "2", "3", "4", "5"], // Monday to Friday
       departureTime: "08:00",
       estimatedArrivalTime: "10:00",
       active: true,
@@ -80,17 +91,30 @@ export function CreateRouteScheduleDialog({
   // Update form when editing
   useEffect(() => {
     if (routeSchedule) {
+      // Make sure we're converting the string to an array
+      const operatingDaysArray = typeof routeSchedule.operatingDays === 'string' 
+        ? routeSchedule.operatingDays.split(",") 
+        : routeSchedule.operatingDays;
+        
       form.reset({
-        operatingDays: routeSchedule.operatingDays,
-        departureTime: new Date(routeSchedule.departureTime).toISOString().substring(11, 16), // HH:MM format
-        estimatedArrivalTime: new Date(routeSchedule.estimatedArrivalTime).toISOString().substring(11, 16),
-        seasonStart: routeSchedule.seasonStart ? new Date(routeSchedule.seasonStart) : undefined,
-        seasonEnd: routeSchedule.seasonEnd ? new Date(routeSchedule.seasonEnd) : undefined,
+        operatingDays: operatingDaysArray,
+        departureTime: new Date(routeSchedule.departureTime)
+          .toISOString()
+          .substring(11, 16),
+        estimatedArrivalTime: new Date(routeSchedule.estimatedArrivalTime)
+          .toISOString()
+          .substring(11, 16),
+        seasonStart: routeSchedule.seasonStart
+          ? new Date(routeSchedule.seasonStart)
+          : undefined,
+        seasonEnd: routeSchedule.seasonEnd
+          ? new Date(routeSchedule.seasonEnd)
+          : undefined,
         active: routeSchedule.active,
       });
     } else {
       form.reset({
-        operatingDays: "1,2,3,4,5",
+        operatingDays: ["1", "2", "3", "4", "5"],
         departureTime: "08:00",
         estimatedArrivalTime: "10:00",
         active: true,
@@ -102,11 +126,16 @@ export function CreateRouteScheduleDialog({
     setError(null);
     
     try {
+      // Make sure operatingDays is an array before joining
+      const operatingDaysString = Array.isArray(data.operatingDays) 
+        ? data.operatingDays.join(",") 
+        : data.operatingDays;
+
       if (isEditing && routeSchedule) {
         await updateRouteSchedule.mutateAsync({
           id: routeSchedule.id,
           data: {
-            operatingDays: data.operatingDays,
+            operatingDays: operatingDaysString,
             departureTime: data.departureTime,
             estimatedArrivalTime: data.estimatedArrivalTime,
             seasonStart: data.seasonStart,
@@ -117,7 +146,7 @@ export function CreateRouteScheduleDialog({
       } else {
         const scheduleData: RouteScheduleFormData = {
           routeId,
-          operatingDays: data.operatingDays,
+          operatingDays: operatingDaysString,
           departureTime: data.departureTime,
           estimatedArrivalTime: data.estimatedArrivalTime,
           seasonStart: data.seasonStart,
@@ -130,8 +159,11 @@ export function CreateRouteScheduleDialog({
       
       form.reset();
       onOpenChange(false);
-    } catch {
-      setError(`Error al ${isEditing ? 'actualizar' : 'crear'} el horario. Por favor, inténtelo de nuevo.`);
+    } catch (err) {
+      console.error("Error submitting form:", err);
+      setError(
+        `Error al ${isEditing ? "actualizar" : "crear"} el horario. Por favor, inténtelo de nuevo.`
+      );
     }
   };
 
@@ -153,15 +185,44 @@ export function CreateRouteScheduleDialog({
             <FormField
               control={form.control}
               name="operatingDays"
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
                   <FormLabel>Días de Operación</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="Ej: 1,2,3,4,5 (Lun-Vie)" 
-                      {...field} 
-                    />
-                  </FormControl>
+                  <div className="grid grid-cols-2 gap-2">
+                    {daysOfWeek.map((day) => (
+                      <FormField
+                        key={day.id}
+                        control={form.control}
+                        name="operatingDays"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={day.id}
+                              className="flex flex-row items-start space-x-2 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(day.id)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...field.value, day.id])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (value) => value !== day.id
+                                          )
+                                        );
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {day.label}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -229,15 +290,17 @@ export function CreateRouteScheduleDialog({
                           selected={field.value}
                           onSelect={field.onChange}
                           disabled={(date) => {
-                            if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
+                            if (
+                              date < new Date(new Date().setHours(0, 0, 0, 0))
+                            ) {
                               return true;
                             }
-                            
-                            const seasonStart = form.getValues("seasonStart");
-                            if (seasonStart && date < seasonStart) {
+
+                            const seasonEnd = form.getValues("seasonEnd");
+                            if (seasonEnd && date > seasonEnd) {
                               return true;
                             }
-                            
+
                             return false;
                           }}
                           initialFocus
@@ -280,15 +343,17 @@ export function CreateRouteScheduleDialog({
                           selected={field.value}
                           onSelect={field.onChange}
                           disabled={(date) => {
-                            if (date < new Date(new Date().setHours(0, 0, 0, 0))) {
+                            if (
+                              date < new Date(new Date().setHours(0, 0, 0, 0))
+                            ) {
                               return true;
                             }
-                            
+
                             const seasonStart = form.getValues("seasonStart");
                             if (seasonStart && date < seasonStart) {
                               return true;
                             }
-                            
+
                             return false;
                           }}
                           initialFocus
