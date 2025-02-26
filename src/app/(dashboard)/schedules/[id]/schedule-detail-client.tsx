@@ -1,30 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, } from "react";
 import { useRouter } from "next/navigation";
-import { useSchedules, type Schedule } from "@/hooks/use-schedules";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EditScheduleDialog } from "../components/edit-schedule-dialog";
-import { 
-  AlertCircle, ArrowLeft, Calendar, Clock, Edit, MapPin, User, 
-  Bus as BusIcon, Plus, UserX, Package, Activity, ClipboardList, 
-  MoreHorizontal 
-} from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { toast } from "@/components/ui/use-toast";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  ArrowLeft, 
+  Calendar, 
+  Clock, 
+  MapPin, 
+  Bus, 
+  User, 
+  Tag, 
+  AlertTriangle,
+  CheckCircle,
+  Edit,
+  Trash
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/components/ui/use-toast";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useSchedule } from "@/hooks/use-schedule";
+import type { Schedule, ScheduleStatus } from "@/types/schedule";
 
 interface ScheduleDetailClientProps {
   id: string;
@@ -32,115 +44,122 @@ interface ScheduleDetailClientProps {
 
 export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) {
   const router = useRouter();
-  const { fetchSchedule, updateScheduleStatus } = useSchedules();
-  const [schedule, setSchedule] = useState<Schedule | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showEditDialog, setShowEditDialog] = useState(false);
+  const { toast } = useToast();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const scheduleData = await fetchSchedule(id);
-        setSchedule(scheduleData);
-      } catch (err) {
-        console.error("Error loading schedule data:", err);
-        setError("No se pudo cargar la información del viaje");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadData();
-  }, [id, fetchSchedule]);
-
-  const handleStatusChange = async (newStatus: string) => {
-    if (!schedule) return;
-    
-    try {
-      const updatedSchedule = await updateScheduleStatus.mutateAsync({
-        id: schedule.id,
-        status: newStatus as ScheduleStatus
-      });
-      
-      setSchedule(updatedSchedule);
-      
-      const statusMessages = {
-        in_progress: "Viaje iniciado exitosamente",
-        completed: "Viaje completado exitosamente",
-        cancelled: "Viaje cancelado exitosamente",
-        delayed: "Viaje marcado como retrasado",
-        scheduled: "Viaje reprogramado exitosamente"
-      };
-      
-      toast({
-        title: "Estado actualizado",
-        description: statusMessages[newStatus as keyof typeof statusMessages] || "Estado actualizado exitosamente"
-      });
-    } catch (err) {
-      console.error("Error updating schedule status:", err);
-    }
-  };
+  const { schedule, isLoading, error, mutate } = useSchedule(id, {
+    include: "bus,primaryDriver,secondaryDriver,route,tickets,parcels"
+  });
 
   const handleBack = () => {
     router.push("/schedules");
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, "PPP", { locale: es });
+  const handleEdit = () => {
+    router.push(`/schedules/${id}/edit`);
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, "HH:mm", { locale: es });
-  };
+  const updateStatus = async (status: ScheduleStatus) => {
+    try {
+      setIsUpdating(true);
+      const response = await fetch(`/api/schedules/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
 
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return format(date, "PPP HH:mm", { locale: es });
-  };
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Error al actualizar el estado");
+      }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "scheduled":
-        return <Badge variant="outline">Programado</Badge>;
-      case "in_progress":
-        return <Badge variant="default">En Progreso</Badge>;
-      case "completed":
-        return <Badge variant="default">Completado</Badge>;
-      case "cancelled":
-        return <Badge variant="destructive">Cancelado</Badge>;
-      case "delayed":
-        return <Badge variant="secondary">Retrasado</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+      await mutate();
+      toast({
+        title: "Estado actualizado",
+        description: `El viaje ha sido marcado como ${getStatusLabel(status)}`,
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al actualizar el estado",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="container mx-auto py-6">
-        <div className="flex items-center mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="mr-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
-          <Skeleton className="h-8 w-64" />
-        </div>
+  const cancelSchedule = async () => {
+    try {
+      setIsCancelling(true);
+      const response = await fetch(`/api/schedules/${id}`, {
+        method: "DELETE",
+      });
 
-        <div className="grid gap-6">
-          <Skeleton className="h-[200px] w-full" />
-          <Skeleton className="h-[300px] w-full" />
-        </div>
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Error al cancelar el viaje");
+      }
+
+      toast({
+        title: "Viaje cancelado",
+        description: "El viaje ha sido cancelado exitosamente",
+      });
+      
+      // Redirect back to schedules list after cancellation
+      router.push("/schedules");
+    } catch (error) {
+      console.error("Error cancelling schedule:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error al cancelar el viaje",
+        variant: "destructive",
+      });
+      setIsCancelling(false);
+    }
+  };
+
+  const getStatusLabel = (status: ScheduleStatus) => {
+    const statusMap = {
+      scheduled: "Programado",
+      in_progress: "En Progreso",
+      completed: "Completado",
+      cancelled: "Cancelado",
+      delayed: "Retrasado",
+    };
+    return statusMap[status] || "Desconocido";
+  };
+
+  const getStatusBadge = (status: ScheduleStatus) => {
+    const statusConfig = {
+      scheduled: { label: "Programado", variant: "outline" as const },
+      in_progress: { label: "En Progreso", variant: "default" as const },
+      completed: { label: "Completado", variant: "secondary" as const },
+      cancelled: { label: "Cancelado", variant: "destructive" as const },
+      delayed: { label: "Retrasado", variant: "default" as const },
+    };
+
+    const config = statusConfig[status] || statusConfig.scheduled;
+
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const formatDate = (date: string | Date) => {
+    return format(new Date(date), "dd MMMM yyyy", { locale: es });
+  };
+
+  const formatTime = (date: string | Date) => {
+    return format(new Date(date), "HH:mm", { locale: es });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -148,410 +167,238 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
   if (error || !schedule) {
     return (
       <div className="container mx-auto py-6">
-        <Button variant="ghost" size="sm" onClick={handleBack} className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver
-        </Button>
-
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            {error || "No se pudo encontrar el viaje solicitado"}
-          </AlertDescription>
-        </Alert>
+        <div className="flex flex-col items-center justify-center h-[50vh]">
+          <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Error al cargar el viaje</h2>
+          <p className="text-muted-foreground mb-4">
+            {error || "No se pudo encontrar la información del viaje"}
+          </p>
+          <Button onClick={handleBack}>Volver a la lista</Button>
+        </div>
       </div>
     );
   }
 
+  const routeName = schedule.routeSchedule?.route?.name || "Ruta no disponible";
+  const ticketCount = schedule._count?.tickets || 0;
+  const parcelCount = schedule._count?.parcels || 0;
+
   return (
     <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="mr-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
-          <h1 className="text-2xl font-bold">
-            Viaje: {schedule.route?.name || "Ruta no disponible"} - {formatDate(schedule.departureDate)}
-          </h1>
-          {getStatusBadge(schedule.status)}
-        </div>
-
-        <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowEditDialog(true)}
-            disabled={["completed", "cancelled"].includes(schedule.status)}
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            Editar
-          </Button>
-
-          {schedule.status === "scheduled" && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => handleStatusChange("in_progress")}
-            >
-              Iniciar Viaje
-            </Button>
-          )}
-
-          {schedule.status === "in_progress" && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => handleStatusChange("completed")}
-            >
-              Completar Viaje
-            </Button>
-          )}
-
-          {["scheduled", "in_progress"].includes(schedule.status) && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => handleStatusChange("cancelled")}
-            >
-              Cancelar Viaje
-            </Button>
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" onClick={handleBack} className="mr-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver
+        </Button>
+        <h1 className="text-3xl font-bold flex-1">
+          Detalle de Viaje: {routeName}
+        </h1>
+        <div className="flex gap-2">
+          {schedule.status !== "cancelled" && schedule.status !== "completed" && (
+            <>
+              <Button variant="outline" onClick={handleEdit}>
+                <Edit className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">
+                    <Trash className="h-4 w-4 mr-2" />
+                    Cancelar Viaje
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta acción cancelará el viaje programado y no se puede deshacer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={cancelSchedule}
+                      disabled={isCancelling}
+                    >
+                      {isCancelling ? "Cancelando..." : "Confirmar"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           )}
         </div>
       </div>
 
-      {/* Schedule details */}
-      <div className="grid gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Información General</CardTitle>
-            <CardDescription>Detalles del viaje programado</CardDescription>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Información de Ruta</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Ruta
-                </p>
-                <div className="flex items-center mt-1">
-                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <p className="text-lg font-medium">
-                    {schedule.route?.name || 
-                     (schedule.routeId ? `ID: ${schedule.routeId}` : "Ruta no disponible")}
-                  </p>
-                </div>
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Ruta:</span>
+                <span className="ml-2">{routeName}</span>
               </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Fecha de Salida
-                </p>
-                <div className="flex items-center mt-1">
-                  <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <p className="text-lg font-medium">{formatDate(schedule.departureDate)}</p>
-                </div>
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Fecha:</span>
+                <span className="ml-2">{formatDate(schedule.departureDate)}</span>
               </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Hora de Salida
-                </p>
-                <div className="flex items-center mt-1">
-                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <p className="text-lg font-medium">{formatTime(schedule.departureDate)}</p>
-                </div>
+              <div className="flex items-center">
+                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Hora de salida:</span>
+                <span className="ml-2">{formatTime(schedule.departureDate)}</span>
               </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Llegada Estimada
-                </p>
-                <div className="flex items-center mt-1">
-                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <p className="text-lg font-medium">{formatDateTime(schedule.estimatedArrivalTime)}</p>
-                </div>
+              <div className="flex items-center">
+                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Llegada estimada:</span>
+                <span className="ml-2">{formatTime(schedule.estimatedArrivalTime)}</span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Bus Asignado
-                </p>
-                <div className="flex items-center mt-1">
-                  <BusIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <p className="text-lg font-medium">{schedule.bus?.plateNumber || "-"}</p>
-                </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Vehículo y Conductores</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Bus className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Bus:</span>
+                <span className="ml-2">{schedule.bus?.plateNumber || "No asignado"}</span>
               </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Conductor Principal
-                </p>
-                <div className="flex items-center mt-1">
-                  <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <p className="text-lg font-medium">{schedule.primaryDriver?.fullName || "-"}</p>
-                </div>
+              <div className="flex items-center">
+                <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Conductor principal:</span>
+                <span className="ml-2">{schedule.primaryDriver?.fullName || "No asignado"}</span>
               </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Conductor Secundario
-                </p>
-                <div className="flex items-center mt-1">
-                  <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <p className="text-lg font-medium">{schedule.secondaryDriver?.fullName || "-"}</p>
-                </div>
+              <div className="flex items-center">
+                <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Conductor secundario:</span>
+                <span className="ml-2">{schedule.secondaryDriver?.fullName || "No asignado"}</span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Precio Base
-                </p>
-                <p className="text-lg font-medium">${schedule.price.toFixed(2)}</p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Estado
-                </p>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Estado y Detalles</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <span className="font-medium mr-2">Estado:</span>
                 {getStatusBadge(schedule.status)}
+              </div>
+              <div className="flex items-center">
+                <Tag className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span className="font-medium">Precio:</span>
+                <span className="ml-2">${schedule.price.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="font-medium">Boletos vendidos:</span>
+                <span className="ml-2">{ticketCount}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="font-medium">Encomiendas:</span>
+                <span className="ml-2">{parcelCount}</span>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs for related content */}
-      <Tabs defaultValue="passengers" className="mt-6">
-        <TabsList>
-          <TabsTrigger value="passengers">Pasajeros</TabsTrigger>
-          <TabsTrigger value="parcels">Encomiendas</TabsTrigger>
-          <TabsTrigger value="logs">Registro de Actividad</TabsTrigger>
-        </TabsList>
+      {schedule.status !== "cancelled" && schedule.status !== "completed" && (
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Actualizar Estado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {schedule.status !== "in_progress" && (
+                <Button
+                  onClick={() => updateStatus("in_progress")}
+                  disabled={isUpdating}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Iniciar Viaje
+                </Button>
+              )}
+              {schedule.status !== "completed" && (
+                <Button
+                  onClick={() => updateStatus("completed")}
+                  disabled={isUpdating}
+                  variant="outline"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Completar Viaje
+                </Button>
+              )}
+              {schedule.status !== "delayed" && (
+                <Button
+                  onClick={() => updateStatus("delayed")}
+                  disabled={isUpdating}
+                  variant="outline"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Marcar como Retrasado
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        <TabsContent value="passengers" className="mt-4">
+      <Tabs defaultValue="tickets">
+        <TabsList>
+          <TabsTrigger value="tickets">Boletos ({ticketCount})</TabsTrigger>
+          <TabsTrigger value="parcels">Encomiendas ({parcelCount})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tickets">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Lista de Pasajeros</CardTitle>
-                <CardDescription>
-                  Pasajeros registrados para este viaje
-                </CardDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  // Implement passenger list generation or ticket creation
-                  toast({
-                    title: "Funcionalidad en desarrollo",
-                    description: "La creación de boletos estará disponible próximamente",
-                  });
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Pasajero
-              </Button>
+            <CardHeader>
+              <CardTitle>Boletos Vendidos</CardTitle>
             </CardHeader>
             <CardContent>
               {schedule.tickets && schedule.tickets.length > 0 ? (
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Asiento</TableHead>
-                        <TableHead>Pasajero</TableHead>
-                        <TableHead>Documento</TableHead>
-                        <TableHead>Precio</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {schedule.tickets.map((ticket) => (
-                        <TableRow key={ticket.id}>
-                          <TableCell>{ticket.busSeat?.seatNumber || "-"}</TableCell>
-                          <TableCell>{ticket.customer?.fullName || "Sin nombre"}</TableCell>
-                          <TableCell>{ticket.customer?.documentId || "-"}</TableCell>
-                          <TableCell>${ticket.price.toFixed(2)}</TableCell>
-                          <TableCell>
-                            {ticket.status === "active" ? (
-                              <Badge variant="outline">Activo</Badge>
-                            ) : (
-                              <Badge variant="destructive">Cancelado</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-4">
+                  {/* Ticket list would go here */}
+                  <p>Lista de boletos vendidos para este viaje</p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center p-8 text-center">
-                  <UserX className="h-10 w-10 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-2">No hay pasajeros registrados para este viaje</p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      // Implement passenger list generation or ticket creation
-                      toast({
-                        title: "Funcionalidad en desarrollo",
-                        description: "La creación de boletos estará disponible próximamente",
-                      });
-                    }}
-                  >
-                    Agregar Pasajero
-                  </Button>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No hay boletos vendidos para este viaje</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="parcels" className="mt-4">
+        <TabsContent value="parcels">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Encomiendas</CardTitle>
-                <CardDescription>
-                  Encomiendas registradas para este viaje
-                </CardDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  // Implement parcel creation
-                  toast({
-                    title: "Funcionalidad en desarrollo",
-                    description: "El registro de encomiendas estará disponible próximamente",
-                  });
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Encomienda
-              </Button>
+            <CardHeader>
+              <CardTitle>Encomiendas</CardTitle>
             </CardHeader>
             <CardContent>
               {schedule.parcels && schedule.parcels.length > 0 ? (
-                <div className="border rounded-md">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tracking</TableHead>
-                        <TableHead>Descripción</TableHead>
-                        <TableHead>Remitente</TableHead>
-                        <TableHead>Destinatario</TableHead>
-                        <TableHead>Precio</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {schedule.parcels.map((parcel) => (
-                        <TableRow key={parcel.id}>
-                          <TableCell>{parcel.trackingNumber}</TableCell>
-                          <TableCell>{parcel.description || "-"}</TableCell>
-                          <TableCell>{parcel.sender?.fullName || "-"}</TableCell>
-                          <TableCell>{parcel.receiver?.fullName || "-"}</TableCell>
-                          <TableCell>${parcel.price.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{parcel.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center p-8 text-center">
-                  <Package className="h-10 w-10 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-2">No hay encomiendas registradas para este viaje</p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      // Implement parcel creation
-                      toast({
-                        title: "Funcionalidad en desarrollo",
-                        description: "El registro de encomiendas estará disponible próximamente",
-                      });
-                    }}
-                  >
-                    Agregar Encomienda
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="logs" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Registro de Actividad</CardTitle>
-              <CardDescription>
-                Historial de actividades para este viaje
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {schedule.busLogs && schedule.busLogs.length > 0 ? (
                 <div className="space-y-4">
-                  {schedule.busLogs.map((log) => (
-                    <div key={log.id} className="flex items-start space-x-4 border-b pb-4 last:border-0">
-                      <div className="bg-muted rounded-full p-2">
-                        <Activity className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium">{log.action}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(log.createdAt), "PPp", { locale: es })}
-                          </p>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">{log.notes || "Sin notas adicionales"}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Por: {log.profile?.fullName || "Usuario del sistema"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                  {/* Parcel list would go here */}
+                  <p>Lista de encomiendas para este viaje</p>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center p-8 text-center">
-                  <ClipboardList className="h-10 w-10 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No hay registros de actividad para este viaje</p>
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No hay encomiendas para este viaje</p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {showEditDialog && (
-        <EditScheduleDialog
-          open={showEditDialog}
-          onOpenChange={setShowEditDialog}
-          schedule={schedule}
-          onUpdate={(updatedSchedule) => setSchedule(updatedSchedule)}
-        />
-      )}
     </div>
   );
 } 
