@@ -196,6 +196,11 @@ export function SeatManagement({
           (s) => s.seatNumber !== editedSeat.seatNumber
         );
 
+        // Determine the status based on isActive
+        const status = editedSeat.isActive ? "available" : "maintenance";
+        
+        console.log(`Setting seat ${editedSeat.seatNumber} status to: ${status}`);
+
         // Add the updated seat
         filteredSeats.push({
           id: findSeatInDatabase(editedSeat.seatNumber)?.id || "",
@@ -203,7 +208,7 @@ export function SeatManagement({
           seatNumber: editedSeat.seatNumber,
           tierId: editedSeat.tierId,
           // Only use available or maintenance as per the schema
-          status: editedSeat.isActive ? "available" : "maintenance",
+          status: status,
           isActive: editedSeat.isActive,
           tier: undefined,
           createdAt:
@@ -238,6 +243,8 @@ export function SeatManagement({
         title: "Éxito",
         description: "Asiento actualizado correctamente",
       });
+      
+      // Force a refresh of the seats data
       onSeatsUpdated();
       setIsDialogOpen(false);
     } catch (error) {

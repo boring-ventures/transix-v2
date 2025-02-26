@@ -30,16 +30,21 @@ export function SeatMatrixViewer({
 }: SeatMatrixViewerProps) {
   const renderSeat = (seat: MatrixSeat) => {
     // Find the corresponding bus seat if it exists
-    const busSeat = seats.find(s => s.seatNumber === seat.name);
-    
+    const busSeat = seats.find((s) => s.seatNumber === seat.name);
+
     // Find the seat tier
-    const seatTier = seatTiers.find((tier) => 
+    const seatTier = seatTiers.find((tier) =>
       busSeat ? tier.id === busSeat.tierId : tier.id === seat.tierId
     );
-    
-    // Only use available or maintenance status
-    const seatStatus = busSeat?.status || "available";
-    
+
+    // Use the SeatStatus type properly
+    const seatStatus = (busSeat?.status || "available") as SeatStatus;
+
+    // For debugging
+    if (seatStatus === "maintenance") {
+      console.log(`Seat ${seat.name} has maintenance status`);
+    }
+
     return (
       <div
         key={seat.id}
@@ -47,10 +52,14 @@ export function SeatMatrixViewer({
           "w-10 h-10 flex items-center justify-center rounded-sm border text-xs font-medium",
           seat.isEmpty && "bg-gray-100 border-dashed border-gray-300",
           !seat.isEmpty && !seatTier && "bg-red-50 border-red-300 text-red-700",
-          !seat.isEmpty && seatTier && seatStatus === "available" && "bg-white border-primary text-primary",
-          seatStatus === "maintenance" && "bg-gray-200 border-gray-500 text-gray-700",
+          !seat.isEmpty &&
+            seatTier &&
+            seatStatus === "available" &&
+            "bg-white border-primary text-primary",
+          seatStatus === "maintenance" &&
+            "bg-gray-200 border-gray-500 text-gray-700"
         )}
-        title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ''}`}
+        title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""} (${seatStatus})`}
       >
         {!seat.isEmpty && seat.name}
       </div>

@@ -64,6 +64,9 @@ export async function POST(
       );
     }
 
+    // Log the incoming seats data for debugging
+    console.log("Updating seats with data:", JSON.stringify(seats, null, 2));
+
     // Delete existing seats
     await prisma.busSeat.deleteMany({
       where: { busId: id },
@@ -71,18 +74,30 @@ export async function POST(
 
     // Create new seats
     const createdSeats = await prisma.busSeat.createMany({
-      data: seats.map((seat: BusSeat) => ({
-        busId: id,
-        seatNumber: seat.seatNumber,
-        tierId: seat.tierId,
-        status: seat.status || "available",
-        isActive: seat.isActive !== undefined ? seat.isActive : true,
-      })),
+      data: seats.map((seat: any) => {
+        // Ensure we're using valid status values
+        const status = seat.isActive ? "available" : "maintenance";
+        
+        return {
+          busId: id,
+          seatNumber: seat.seatNumber,
+          tierId: seat.tierId,
+          status: seat.status || status,
+          isActive: seat.isActive !== undefined ? seat.isActive : true,
+        };
+      }),
+    });
+
+    // Fetch the updated seats to return
+    const updatedSeats = await prisma.busSeat.findMany({
+      where: { busId: id },
+      include: { tier: true },
     });
 
     return NextResponse.json({ 
       message: "Bus seats updated successfully",
-      count: createdSeats.count
+      count: createdSeats.count,
+      seats: updatedSeats
     });
   } catch (error) {
     console.error("Error updating bus seats:", error);
