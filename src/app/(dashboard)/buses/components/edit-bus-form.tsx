@@ -60,6 +60,7 @@ interface MatrixSeat {
   tierId?: string;
 }
 
+
 export function EditBusForm({ bus }: EditBusFormProps) {
   const router = useRouter();
   const {
@@ -83,6 +84,8 @@ export function EditBusForm({ bus }: EditBusFormProps) {
   const [seatType, setSeatType] = useState<string>("");
   const [seatStatus, setSeatStatus] = useState<string>("available");
   const [isSeatEmpty, setIsSeatEmpty] = useState<boolean>(false);
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [bulkEditMode, setBulkEditMode] = useState<boolean>(false);
 
   const form = useForm<EditBusFormValues>({
     resolver: zodResolver(formSchema),
@@ -307,6 +310,93 @@ export function EditBusForm({ bus }: EditBusFormProps) {
     setSelectedSeat(null);
   };
 
+  // Add this function to handle seat selection for bulk editing
+  const handleSeatSelection = (seatNumber: string) => {
+    if (!bulkEditMode) {
+      // Single seat mode - just select this seat
+      handleSeatClick(seatNumber);
+      return;
+    }
+
+    // Bulk edit mode - toggle selection
+    setSelectedSeats((prev) =>
+      prev.includes(seatNumber)
+        ? prev.filter((s) => s !== seatNumber)
+        : [...prev, seatNumber]
+    );
+  };
+
+  // Add this function to apply changes to multiple seats
+  const handleBulkUpdate = () => {
+    if (selectedSeats.length === 0) return;
+
+    // Create a copy of the current seats
+    const updatedSeats = [...seats];
+
+    // Update each selected seat
+    for (const seatNumber of selectedSeats) {
+      const seatIndex = updatedSeats.findIndex(
+        (seat) => seat.seatNumber === seatNumber
+      );
+
+      if (isSeatEmpty) {
+        // If marking as empty, remove from seats array
+        if (seatIndex !== -1) {
+          updatedSeats.splice(seatIndex, 1);
+        }
+
+        // Update the matrix to mark the seat as empty
+        const updatedMatrix = JSON.parse(JSON.stringify(bus.seatMatrix));
+        const firstFloorSeat = updatedMatrix.firstFloor.seats.find(
+          (seat: MatrixSeat) => seat.name === seatNumber
+        );
+
+        if (firstFloorSeat) {
+          firstFloorSeat.isEmpty = true;
+        } else if (updatedMatrix.secondFloor) {
+          const secondFloorSeat = updatedMatrix.secondFloor.seats.find(
+            (seat: MatrixSeat) => seat.name === seatNumber
+          );
+          if (secondFloorSeat) {
+            secondFloorSeat.isEmpty = true;
+          }
+        }
+
+        // Update the matrix
+        updateBus.mutateAsync({
+          id: bus.id,
+          data: { seatMatrix: updatedMatrix },
+        });
+      } else {
+        // If the seat exists, update it
+        if (seatIndex !== -1) {
+          updatedSeats[seatIndex] = {
+            ...updatedSeats[seatIndex],
+            tierId: seatType,
+            status: seatStatus,
+            isActive: seatStatus === "available",
+          };
+        } else {
+          // If the seat doesn't exist, add it
+          updatedSeats.push({
+            busId: bus.id,
+            seatNumber: seatNumber,
+            tierId: seatType,
+            status: seatStatus,
+            isActive: seatStatus === "available",
+          } as BusSeat);
+        }
+      }
+    }
+
+    // Update all seats
+    handleUpdateSeats(updatedSeats);
+
+    // Clear selection
+    setSelectedSeats([]);
+    setBulkEditMode(false);
+  };
+
   return (
     <div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -451,109 +541,286 @@ export function EditBusForm({ bus }: EditBusFormProps) {
         <TabsContent value="seats">
           <Card>
             <CardHeader>
-              <CardTitle>Configuración de Asientos</CardTitle>
+              <CardTitle className="flex justify-between items-center">
+                <span>Configuración de Asientos</span>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="bulk-edit"
+                    checked={bulkEditMode}
+                    onCheckedChange={setBulkEditMode}
+                  />
+                  <Label htmlFor="bulk-edit" className="text-sm">
+                    Edición múltiple
+                  </Label>
+                </div>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {/* Seat selection UI */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Seat Matrix Viewer */}
                   <div>
-                    <h3 className="text-sm font-medium mb-4">
-                      Seleccione un asiento para configurar
-                    </h3>
-
-                    {/* First Floor */}
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium mb-2">Primer Piso</h4>
-                      <div className="grid gap-1">
-                        {Array.from({
-                          length: bus.seatMatrix.firstFloor.dimensions.rows,
-                        }).map((_, rowIndex) => (
-                          <div
-                            key={`first-floor-row-${rowIndex}-${bus.id}`}
-                            className="flex gap-1"
-                          >
-                            {bus.seatMatrix.firstFloor.seats
-                              .filter(
-                                (seat: MatrixSeat) => seat.row === rowIndex
-                              )
-                              .map((seat: MatrixSeat) => {
-                                const busSeat = seats.find(
-                                  (s: BusSeat) => s.seatNumber === seat.name
-                                );
-                                const isSelected = selectedSeat === seat.name;
+                      <h3 className="text-sm font-medium mb-2">
+                        {bulkEditMode
+                          ? `Seleccione asientos (${selectedSeats.length} seleccionados)`
+                          : "Seleccione un asiento para configurar"}
+                      </h3>
 
-                                return (
-                                  <button
-                                    key={seat.id}
-                                    type="button"
-                                    className={`w-10 h-10 flex items-center justify-center rounded-sm border text-xs font-medium 
-                                      ${seat.isEmpty ? "bg-gray-100 border-dashed border-gray-300" : ""}
-                                      ${!seat.isEmpty && busSeat?.status === "available" ? "bg-white border-primary text-primary" : ""}
-                                      ${!seat.isEmpty && busSeat?.status === "maintenance" ? "bg-gray-200 border-gray-500 text-gray-700" : ""}
-                                      ${isSelected ? "ring-2 ring-offset-1 ring-primary" : ""}
-                                    `}
-                                    onClick={() => handleSeatClick(seat.name)}
-                                  >
-                                    {seat.name}
-                                  </button>
-                                );
-                              })}
-                          </div>
-                        ))}
-                      </div>
+                      {bulkEditMode && selectedSeats.length > 0 && (
+                        <div className="flex justify-between items-center mb-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedSeats([])}
+                          >
+                            Limpiar selección
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleBulkUpdate}
+                            disabled={isUpdatingSeats}
+                          >
+                            {isUpdatingSeats ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Actualizando...
+                              </>
+                            ) : (
+                              "Aplicar a seleccionados"
+                            )}
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Second Floor if exists */}
-                    {bus.seatMatrix.secondFloor && (
-                      <div>
-                        <h4 className="text-sm font-medium mb-2">
-                          Segundo Piso
-                        </h4>
-                        <div className="grid gap-1">
-                          {Array.from({
-                            length: bus.seatMatrix.secondFloor.dimensions.rows,
-                          }).map((_, rowIndex) => (
-                            <div
-                              key={`second-floor-row-${rowIndex}-${bus.id}`}
-                              className="flex gap-1"
-                            >
-                              {bus.seatMatrix.secondFloor?.seats
-                                .filter(
-                                  (seat: MatrixSeat) => seat.row === rowIndex
-                                )
-                                .map((seat: MatrixSeat) => {
-                                  const busSeat = seats.find(
-                                    (s: BusSeat) => s.seatNumber === seat.name
-                                  );
-                                  const isSelected = selectedSeat === seat.name;
+                    {/* Use SeatMatrixViewer with custom rendering for selection */}
+                    <div className="border rounded-md p-2">
+                      <Tabs defaultValue="firstFloor">
+                        <TabsList className="mb-4">
+                          <TabsTrigger value="firstFloor">
+                            Primer Piso
+                          </TabsTrigger>
+                          {bus.seatMatrix.secondFloor && (
+                            <TabsTrigger value="secondFloor">
+                              Segundo Piso
+                            </TabsTrigger>
+                          )}
+                        </TabsList>
 
-                                  return (
-                                    <button
-                                      key={seat.id}
-                                      type="button"
-                                      className={`w-10 h-10 flex items-center justify-center rounded-sm border text-xs font-medium 
-                                        ${seat.isEmpty ? "bg-gray-100 border-dashed border-gray-300" : ""}
-                                        ${!seat.isEmpty && busSeat?.status === "available" ? "bg-white border-primary text-primary" : ""}
-                                        ${!seat.isEmpty && busSeat?.status === "maintenance" ? "bg-gray-200 border-gray-500 text-gray-700" : ""}
-                                        ${isSelected ? "ring-2 ring-offset-1 ring-primary" : ""}
-                                      `}
-                                      onClick={() => handleSeatClick(seat.name)}
-                                    >
-                                      {seat.name}
-                                    </button>
-                                  );
-                                })}
+                        <TabsContent value="firstFloor">
+                          <div className="space-y-4">
+                            <div className="grid gap-1">
+                              {Array.from({
+                                length:
+                                  bus.seatMatrix.firstFloor.dimensions.rows,
+                              }).map((_, rowIndex) => (
+                                <div
+                                  key={`first-floor-row-${rowIndex}-${bus.id}`}
+                                  className="flex gap-1"
+                                >
+                                  {bus.seatMatrix.firstFloor.seats
+                                    .filter(
+                                      (seat: MatrixSeat) =>
+                                        seat.row === rowIndex
+                                    )
+                                    .map((seat: MatrixSeat) => {
+                                      const busSeat = seats.find(
+                                        (s: BusSeat) =>
+                                          s.seatNumber === seat.name
+                                      );
+                                      const isSelected = bulkEditMode
+                                        ? selectedSeats.includes(seat.name)
+                                        : selectedSeat === seat.name;
+
+                                      // Find the seat tier
+                                      const seatTier = seatTiers.find(
+                                        (tier: SeatTier) =>
+                                          busSeat
+                                            ? tier.id === busSeat.tierId
+                                            : tier.id === seat.tierId
+                                      );
+
+                                      // Get tier abbreviation for display
+                                      const tierAbbr = seatTier?.name
+                                        ? seatTier.name.substring(0, 2)
+                                        : "";
+
+                                      return (
+                                        <button
+                                          key={seat.id}
+                                          type="button"
+                                          className={`w-10 h-10 flex flex-col items-center justify-center rounded-sm border text-xs font-medium 
+                                            ${seat.isEmpty ? "bg-gray-100 border-dashed border-gray-300" : ""}
+                                            ${!seat.isEmpty && !seatTier ? "bg-red-50 border-red-300 text-red-700" : ""}
+                                            ${!seat.isEmpty && seatTier && busSeat?.status === "available" ? "bg-white border-primary text-primary" : ""}
+                                            ${!seat.isEmpty && busSeat?.status === "maintenance" ? "bg-gray-200 border-gray-500 text-gray-700" : ""}
+                                            ${isSelected ? "ring-2 ring-offset-1 ring-primary" : ""}
+                                          `}
+                                          onClick={() =>
+                                            handleSeatSelection(seat.name)
+                                          }
+                                          title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""}`}
+                                        >
+                                          {!seat.isEmpty && (
+                                            <>
+                                              <span className="text-[10px] font-semibold">
+                                                {tierAbbr}
+                                              </span>
+                                              <span>{seat.name}</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          </div>
+                        </TabsContent>
+
+                        {bus.seatMatrix.secondFloor && (
+                          <TabsContent value="secondFloor">
+                            <div className="space-y-4">
+                              <div className="grid gap-1">
+                                {Array.from({
+                                  length:
+                                    bus.seatMatrix.secondFloor.dimensions.rows,
+                                }).map((_, rowIndex) => (
+                                  <div
+                                    key={`second-floor-row-${rowIndex}-${bus.id}`}
+                                    className="flex gap-1"
+                                  >
+                                    {bus.seatMatrix.secondFloor?.seats
+                                      .filter(
+                                        (seat: MatrixSeat) =>
+                                          seat.row === rowIndex
+                                      )
+                                      .map((seat: MatrixSeat) => {
+                                        const busSeat = seats.find(
+                                          (s: BusSeat) =>
+                                            s.seatNumber === seat.name
+                                        );
+                                        const isSelected = bulkEditMode
+                                          ? selectedSeats.includes(seat.name)
+                                          : selectedSeat === seat.name;
+
+                                        // Find the seat tier
+                                        const seatTier = seatTiers.find(
+                                          (tier: SeatTier) =>
+                                            busSeat
+                                              ? tier.id === busSeat.tierId
+                                              : tier.id === seat.tierId
+                                        );
+
+                                        // Get tier abbreviation for display
+                                        const tierAbbr = seatTier?.name
+                                          ? seatTier.name.substring(0, 2)
+                                          : "";
+
+                                        return (
+                                          <button
+                                            key={seat.id}
+                                            type="button"
+                                            className={`w-10 h-10 flex flex-col items-center justify-center rounded-sm border text-xs font-medium 
+                                              ${seat.isEmpty ? "bg-gray-100 border-dashed border-gray-300" : ""}
+                                              ${!seat.isEmpty && !seatTier ? "bg-red-50 border-red-300 text-red-700" : ""}
+                                              ${!seat.isEmpty && seatTier && busSeat?.status === "available" ? "bg-white border-primary text-primary" : ""}
+                                              ${!seat.isEmpty && busSeat?.status === "maintenance" ? "bg-gray-200 border-gray-500 text-gray-700" : ""}
+                                              ${isSelected ? "ring-2 ring-offset-1 ring-primary" : ""}
+                                            `}
+                                            onClick={() =>
+                                              handleSeatSelection(seat.name)
+                                            }
+                                            title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""}`}
+                                          >
+                                            {!seat.isEmpty && (
+                                              <>
+                                                <span className="text-[10px] font-semibold">
+                                                  {tierAbbr}
+                                                </span>
+                                                <span>{seat.name}</span>
+                                              </>
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </TabsContent>
+                        )}
+                      </Tabs>
+                    </div>
                   </div>
 
-                  {/* Seat configuration */}
+                  {/* Seat Configuration Panel */}
                   <div>
-                    {selectedSeat ? (
+                    {bulkEditMode ? (
+                      <div className="space-y-4 border p-4 rounded-md">
+                        <h3 className="text-sm font-medium">
+                          Configurar {selectedSeats.length} asientos
+                          seleccionados
+                        </h3>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="bulk-is-empty">Espacio Vacío</Label>
+                            <Switch
+                              id="bulk-is-empty"
+                              checked={isSeatEmpty}
+                              onCheckedChange={setIsSeatEmpty}
+                            />
+                          </div>
+
+                          {!isSeatEmpty && (
+                            <>
+                              <div className="space-y-2">
+                                <Label htmlFor="bulk-seat-type">
+                                  Tipo de Asiento
+                                </Label>
+                                <Select
+                                  value={seatType}
+                                  onValueChange={setSeatType}
+                                >
+                                  <SelectTrigger id="bulk-seat-type">
+                                    <SelectValue placeholder="Seleccionar tipo" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {seatTiers.map((tier: SeatTier) => (
+                                      <SelectItem key={tier.id} value={tier.id}>
+                                        {tier.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="bulk-seat-status">Estado</Label>
+                                <Select
+                                  value={seatStatus}
+                                  onValueChange={setSeatStatus}
+                                >
+                                  <SelectTrigger id="bulk-seat-status">
+                                    <SelectValue placeholder="Seleccionar estado" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="available">
+                                      Disponible
+                                    </SelectItem>
+                                    <SelectItem value="maintenance">
+                                      Mantenimiento
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ) : selectedSeat ? (
                       <div className="space-y-4 border p-4 rounded-md">
                         <h3 className="text-sm font-medium">
                           Configurar Asiento {selectedSeat}
@@ -640,7 +907,8 @@ export function EditBusForm({ bus }: EditBusFormProps) {
                     ) : (
                       <div className="flex items-center justify-center h-full border border-dashed p-8 rounded-md">
                         <p className="text-muted-foreground">
-                          Seleccione un asiento para configurar
+                          Seleccione un asiento para configurar o active el modo
+                          de edición múltiple
                         </p>
                       </div>
                     )}
@@ -651,10 +919,12 @@ export function EditBusForm({ bus }: EditBusFormProps) {
                 <div className="mt-6 space-y-2">
                   <h4 className="text-sm font-medium">Leyenda</h4>
                   <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
-                      <span className="text-sm">Disponible</span>
-                    </div>
+                    {seatTiers.map((tier: SeatTier) => (
+                      <div key={tier.id} className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
+                        <span className="text-sm">{tier.name}</span>
+                      </div>
+                    ))}
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-gray-200 border border-gray-500 rounded-sm" />
                       <span className="text-sm">Mantenimiento</span>
