@@ -27,6 +27,7 @@ export default function BusDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [bus, setBus] = useState<Bus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [seatCapacity, setSeatCapacity] = useState<number>(0);
   
   // Get bus details
   const { fetchBus } = useBuses();
@@ -38,6 +39,28 @@ export default function BusDetailPage() {
       try {
         const busData = await fetchBus(id as string);
         setBus(busData);
+        
+        // Calculate seat capacity from the seat matrix
+        if (busData?.seatMatrix) {
+          let totalSeats = 0;
+          
+          // Count non-empty seats in first floor
+          if (busData.seatMatrix.firstFloor) {
+            totalSeats += busData.seatMatrix.firstFloor.seats.filter(
+              (seat: any) => !seat.isEmpty
+            ).length;
+          }
+          
+          // Count non-empty seats in second floor if it exists
+          if (busData.seatMatrix.secondFloor) {
+            totalSeats += busData.seatMatrix.secondFloor.seats.filter(
+              (seat: any) => !seat.isEmpty
+            ).length;
+          }
+          
+          setSeatCapacity(totalSeats);
+        }
+        
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching bus details:", err);
@@ -50,6 +73,15 @@ export default function BusDetailPage() {
       getBusDetails();
     }
   }, [id, fetchBus]);
+  
+  // Update seat capacity when seats change
+  useEffect(() => {
+    if (seats && seats.length > 0) {
+      // Count active seats
+      const activeSeats = seats.filter(seat => seat.isActive).length;
+      setSeatCapacity(activeSeats);
+    }
+  }, [seats]);
   
   if (isLoading) {
     return (
@@ -191,7 +223,7 @@ export default function BusDetailPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Capacidad</h3>
-                  <p className="text-lg">{bus._count?.busSeats || 0} asientos</p>
+                  <p className="text-lg">{seatCapacity} asientos</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Fecha de Registro</h3>
