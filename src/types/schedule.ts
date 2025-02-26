@@ -1,32 +1,46 @@
-import type { Bus } from "./bus";
-import type { Driver } from "./driver";
-import type { Route, RouteSchedule } from "./route";
-import type { BusLog } from "./log";
-import type { Ticket } from "./ticket";
-import type { Parcel } from "./parcel";
+import type {
+  Bus,
+  Driver,
+  Schedule as PrismaSchedule,
+  BusLog,
+} from "@prisma/client";
 
-export type ScheduleStatus = "scheduled" | "in_progress" | "delayed" | "completed" | "cancelled";
+export type ScheduleStatus =
+  | "scheduled"
+  | "in_progress"
+  | "delayed"
+  | "completed"
+  | "cancelled";
 
-export interface Schedule {
-  id: string;
-  routeScheduleId: string;
-  routeSchedule?: RouteSchedule & { route?: Route };
-  busId: string;
-  bus?: Bus;
-  primaryDriverId: string;
-  primaryDriver?: Driver;
-  secondaryDriverId?: string;
-  secondaryDriver?: Driver;
-  departureDate: Date | string;
-  estimatedArrivalTime: Date | string;
-  actualDepartureTime?: Date | string;
-  actualArrivalTime?: Date | string;
+export interface Schedule extends Omit<PrismaSchedule, "status"> {
   status: ScheduleStatus;
-  price: number;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  tickets?: Ticket[];
-  parcels?: Parcel[];
+  bus?: Bus;
+  primaryDriver?: Driver;
+  secondaryDriver?: Driver;
+  routeSchedule?: {
+    id: string;
+    routeId: string;
+    departureTime: string;
+    estimatedArrivalTime: string;
+    operatingDays: string;
+    route?: {
+      id: string;
+      name: string;
+      originId: string;
+      destinationId: string;
+      estimatedDuration: number;
+    };
+  };
+  tickets?: Array<{
+    id: string;
+    status: string;
+    price: number;
+  }>;
+  parcels?: Array<{
+    id: string;
+    status: string;
+    price: number;
+  }>;
   busLogs?: BusLog[];
   _count?: {
     tickets: number;
@@ -38,4 +52,4 @@ export interface Schedule {
 
 export interface ScheduleStatusUpdate {
   status: ScheduleStatus;
-} 
+}
