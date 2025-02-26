@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useBuses, type Bus } from "@/hooks/use-buses";
-import { useBusSeats } from "@/hooks/use-bus-seats";
+import { type BusSeat, type MatrixSeat, useBusSeats } from "@/hooks/use-bus-seats";
 import { useSeatTiers } from "@/hooks/use-seat-tiers";
 import {
   Card,
@@ -28,39 +28,39 @@ export default function BusDetailPage() {
   const [bus, setBus] = useState<Bus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [seatCapacity, setSeatCapacity] = useState<number>(0);
-  
+
   // Get bus details
   const { fetchBus } = useBuses();
   const { seats } = useBusSeats(id as string);
   const { seatTiers } = useSeatTiers(bus?.companyId);
-  
+
   useEffect(() => {
     const getBusDetails = async () => {
       try {
         const busData = await fetchBus(id as string);
         setBus(busData);
-        
+
         // Calculate seat capacity from the seat matrix
         if (busData?.seatMatrix) {
           let totalSeats = 0;
-          
+
           // Count non-empty seats in first floor
           if (busData.seatMatrix.firstFloor) {
             totalSeats += busData.seatMatrix.firstFloor.seats.filter(
-              (seat: any) => !seat.isEmpty
+              (seat: MatrixSeat) => !seat.isEmpty
             ).length;
           }
-          
+
           // Count non-empty seats in second floor if it exists
           if (busData.seatMatrix.secondFloor) {
             totalSeats += busData.seatMatrix.secondFloor.seats.filter(
-              (seat: any) => !seat.isEmpty
+              (seat: MatrixSeat) => !seat.isEmpty
             ).length;
           }
-          
+
           setSeatCapacity(totalSeats);
         }
-        
+
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching bus details:", err);
@@ -68,29 +68,25 @@ export default function BusDetailPage() {
         setIsLoading(false);
       }
     };
-    
+
     if (id) {
       getBusDetails();
     }
   }, [id, fetchBus]);
-  
+
   // Update seat capacity when seats change
   useEffect(() => {
     if (seats && seats.length > 0) {
       // Count active seats
-      const activeSeats = seats.filter(seat => seat.isActive).length;
+      const activeSeats = seats.filter((seat: BusSeat) => seat.isActive).length;
       setSeatCapacity(activeSeats);
     }
   }, [seats]);
-  
+
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Button 
-          variant="outline" 
-          disabled
-          className="mb-6"
-        >
+        <Button variant="outline" disabled className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver
         </Button>
@@ -100,7 +96,7 @@ export default function BusDetailPage() {
       </div>
     );
   }
-  
+
   if (error || !bus) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh]">
@@ -116,28 +112,26 @@ export default function BusDetailPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto py-6">
-      <Button 
-        variant="outline" 
-        onClick={() => router.back()}
-        className="mb-6"
-      >
+      <Button variant="outline" onClick={() => router.back()} className="mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" />
         Volver
       </Button>
-      
+
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{bus.plateNumber}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {bus.plateNumber}
+          </h1>
           <p className="text-muted-foreground">
-            {bus.company?.name || "Sin empresa asignada"} • 
+            {bus.company?.name || "Sin empresa asignada"} •
             {bus.template?.name || "Sin plantilla asignada"}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
+          <Button
             variant="outline"
             onClick={() => router.push(`/buses/${id}/edit`)}
           >
@@ -146,14 +140,14 @@ export default function BusDetailPage() {
           </Button>
         </div>
       </div>
-      
+
       <Tabs defaultValue="details">
         <TabsList className="mb-4">
           <TabsTrigger value="details">Detalles</TabsTrigger>
           <TabsTrigger value="seats">Asientos</TabsTrigger>
           <TabsTrigger value="schedules">Horarios</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="details">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <Card>
@@ -168,13 +162,14 @@ export default function BusDetailPage() {
                   </Badge>
                   <Badge variant="outline">
                     {bus.maintenanceStatus === "active" && "Operativo"}
-                    {bus.maintenanceStatus === "in_maintenance" && "En Mantenimiento"}
+                    {bus.maintenanceStatus === "in_maintenance" &&
+                      "En Mantenimiento"}
                     {bus.maintenanceStatus === "retired" && "Retirado"}
                   </Badge>
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Plantilla</CardTitle>
@@ -192,48 +187,64 @@ export default function BusDetailPage() {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Viajes Programados</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Viajes Programados
+                </CardTitle>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{bus._count?.schedules || 0}</div>
+                <div className="text-2xl font-bold">
+                  {bus._count?.schedules || 0}
+                </div>
               </CardContent>
             </Card>
           </div>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Información del Bus</CardTitle>
-              <CardDescription>
-                Detalles completos del vehículo
-              </CardDescription>
+              <CardDescription>Detalles completos del vehículo</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Placa</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Placa
+                  </h3>
                   <p className="text-lg">{bus.plateNumber}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Empresa</h3>
-                  <p className="text-lg">{bus.company?.name || "Sin empresa asignada"}</p>
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Empresa
+                  </h3>
+                  <p className="text-lg">
+                    {bus.company?.name || "Sin empresa asignada"}
+                  </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Capacidad</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Capacidad
+                  </h3>
                   <p className="text-lg">{seatCapacity} asientos</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Fecha de Registro</h3>
-                  <p className="text-lg">{format(new Date(bus.createdAt), "d 'de' MMMM, yyyy", { locale: es })}</p>
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Fecha de Registro
+                  </h3>
+                  <p className="text-lg">
+                    {format(new Date(bus.createdAt), "d 'de' MMMM, yyyy", {
+                      locale: es,
+                    })}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="seats">
           <Card>
             <CardHeader>
@@ -243,22 +254,20 @@ export default function BusDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <SeatMatrixViewer 
-                matrix={bus.seatMatrix} 
-                seatTiers={seatTiers || []} 
+              <SeatMatrixViewer
+                matrix={bus.seatMatrix}
+                seatTiers={seatTiers || []}
                 seats={seats}
               />
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="schedules">
           <Card>
             <CardHeader>
               <CardTitle>Viajes Programados</CardTitle>
-              <CardDescription>
-                Horarios asignados a este bus
-              </CardDescription>
+              <CardDescription>Horarios asignados a este bus</CardDescription>
             </CardHeader>
             <CardContent>
               {bus._count?.schedules ? (
@@ -266,7 +275,9 @@ export default function BusDetailPage() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-8">
                   <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No hay viajes programados para este bus</p>
+                  <p className="text-muted-foreground">
+                    No hay viajes programados para este bus
+                  </p>
                 </div>
               )}
             </CardContent>

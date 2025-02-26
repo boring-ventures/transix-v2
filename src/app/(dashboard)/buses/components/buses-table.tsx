@@ -7,6 +7,7 @@ import { DataTable } from "@/components/table/data-table";
 import { DeleteBusDialog } from "./delete-bus-dialog";
 import type { Column } from "@/components/table/types";
 import type { Bus } from "@/hooks/use-buses";
+import type { MatrixSeat } from "@/hooks/use-bus-seats";
 
 interface BusesTableProps {
   data: Bus[];
@@ -23,6 +24,31 @@ export function BusesTable({
 }: BusesTableProps) {
   const router = useRouter();
   const [busToDelete, setBusToDelete] = useState<string | null>(null);
+
+  // Helper function to calculate active seats for a bus
+  const calculateActiveSeats = (bus: Bus): number => {
+    // If we have the busSeats array with active status
+    if (bus.busSeats && bus.busSeats.length > 0) {
+      return bus.busSeats.filter((seat) => seat.isActive).length;
+    }
+
+    // Otherwise calculate from the seat matrix
+    let totalSeats = 0;
+
+    if (bus.seatMatrix?.firstFloor) {
+      totalSeats += bus.seatMatrix.firstFloor.seats.filter(
+        (seat: MatrixSeat) => !seat.isEmpty
+      ).length;
+    }
+
+    if (bus.seatMatrix?.secondFloor) {
+      totalSeats += bus.seatMatrix.secondFloor.seats.filter(
+        (seat: MatrixSeat) => !seat.isEmpty
+      ).length;
+    }
+
+    return totalSeats;
+  };
 
   const columns: Column<Bus>[] = [
     {
@@ -50,9 +76,9 @@ export function BusesTable({
     {
       id: "seats",
       header: "Asientos",
-      accessorKey: "_count.busSeats",
+      accessorFn: (row) => calculateActiveSeats(row),
       cell: ({ row }) => (
-        <div className="text-center">{row._count?.busSeats || 0}</div>
+        <div className="text-center">{calculateActiveSeats(row)}</div>
       ),
     },
     {

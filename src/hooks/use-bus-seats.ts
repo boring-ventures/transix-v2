@@ -17,6 +17,15 @@ export type BusSeat = {
   tier?: SeatTier;
 };
 
+export type MatrixSeat = {
+  id: string;
+  name: string;
+  row: number;
+  column: number;
+  isEmpty: boolean;
+  tierId?: string;
+}
+
 export type BusSeatFormData = {
   busId: string;
   seatNumber: string;

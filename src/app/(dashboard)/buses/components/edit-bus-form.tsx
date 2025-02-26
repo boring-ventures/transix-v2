@@ -33,7 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import type { MaintenanceStatus, SeatTier } from "@prisma/client";
-import type { BusSeat } from "@/hooks/use-bus-seats";
+import type { BusSeat, MatrixSeat } from "@/hooks/use-bus-seats";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
@@ -50,16 +50,6 @@ type EditBusFormValues = z.infer<typeof formSchema>;
 interface EditBusFormProps {
   bus: Bus;
 }
-
-interface MatrixSeat {
-  id: string;
-  name: string;
-  row: number;
-  column: number;
-  isEmpty: boolean;
-  tierId?: string;
-}
-
 
 export function EditBusForm({ bus }: EditBusFormProps) {
   const router = useRouter();

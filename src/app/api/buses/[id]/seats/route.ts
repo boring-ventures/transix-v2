@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { BusSeat } from "@/hooks/use-bus-seats";
 
 // Get all seats for a specific bus
 export async function GET(
