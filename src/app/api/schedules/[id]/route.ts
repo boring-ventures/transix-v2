@@ -26,7 +26,7 @@ export async function GET(
     const include = searchParams.get("include")?.split(",") || [];
 
     // Build include object based on query params
-    const includeObj: any = {
+    const includeObj = {
       bus: include.includes("bus"),
       primaryDriver: include.includes("primaryDriver"),
       secondaryDriver: include.includes("secondaryDriver"),
@@ -39,13 +39,10 @@ export async function GET(
         : true,
       tickets: include.includes("tickets"),
       parcels: include.includes("parcels"),
-      busLogs: include.includes("logs"),
       _count: {
         select: {
           tickets: true,
           parcels: true,
-          busLogs: true,
-          occupancyLogs: true,
         },
       },
     };
