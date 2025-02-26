@@ -7,7 +7,7 @@ import type { ScheduleStatus } from "@prisma/client";
 // Get a specific schedule by ID
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get the Supabase client
@@ -21,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(req.url);
     const include = searchParams.get("include")?.split(",") || [];
 
@@ -72,7 +72,7 @@ export async function GET(
 // Update a schedule
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get the Supabase client
@@ -86,7 +86,7 @@ export async function PATCH(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const data = await req.json();
 
     // Check if schedule exists
@@ -153,7 +153,7 @@ export async function PATCH(
 // Delete a schedule (soft delete by setting status to cancelled)
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get the Supabase client
@@ -167,7 +167,7 @@ export async function DELETE(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Check if schedule exists
     const existingSchedule = await prisma.schedule.findUnique({

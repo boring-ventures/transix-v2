@@ -5,7 +5,7 @@ import type { BusLog } from "./log";
 import type { Ticket } from "./ticket";
 import type { Parcel } from "./parcel";
 
-export type ScheduleStatus = "scheduled" | "in_progress" | "completed" | "cancelled" | "delayed";
+export type ScheduleStatus = "scheduled" | "in_progress" | "delayed" | "completed" | "cancelled";
 
 export interface Schedule {
   id: string;

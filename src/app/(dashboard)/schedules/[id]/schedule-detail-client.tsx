@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +35,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useSchedule } from "@/hooks/use-schedule";
-import type { Schedule, ScheduleStatus } from "@/types/schedule";
+import type { ScheduleStatus } from "@/types/schedule";
 
 interface ScheduleDetailClientProps {
   id: string;
@@ -171,7 +170,7 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
           <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
           <h2 className="text-2xl font-bold mb-2">Error al cargar el viaje</h2>
           <p className="text-muted-foreground mb-4">
-            {error || "No se pudo encontrar la información del viaje"}
+            {error instanceof Error ? error.message : "No se pudo encontrar la información del viaje"}
           </p>
           <Button onClick={handleBack}>Volver a la lista</Button>
         </div>
@@ -330,7 +329,7 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
                   Iniciar Viaje
                 </Button>
               )}
-              {schedule.status !== "completed" && (
+              {(schedule.status as ScheduleStatus) !== "completed" && (
                 <Button
                   onClick={() => updateStatus("completed")}
                   disabled={isUpdating}

@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import type { ScheduleStatus } from "@prisma/client";
 
 // Update the status of a schedule
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get the Supabase client
@@ -22,7 +21,7 @@ export async function PATCH(
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const { status } = await req.json();
 
     // Validate status
@@ -44,7 +43,6 @@ export async function PATCH(
         ...(status === "completed" ? { actualArrivalTime: new Date() } : {}),
       },
       include: {
-        route: true,
         bus: true,
         primaryDriver: true,
         secondaryDriver: true,
@@ -60,13 +58,7 @@ export async function PATCH(
     await prisma.busLog.create({
       data: {
         scheduleId: id,
-        action: `Viaje ${
-          status === "in_progress" ? "iniciado" :
-          status === "completed" ? "completado" :
-          status === "cancelled" ? "cancelado" :
-          status === "delayed" ? "retrasado" :
-          "reprogramado"
-        }`,
+        type: "SCHEDULE_STATUS_CHANGED",
         notes: `Estado cambiado a: ${status}`,
         profileId: session.user.id,
       },

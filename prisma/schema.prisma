@@ -143,21 +143,24 @@ model Schedule {
   oldReassignments     TicketReassignment[] @relation("OldSchedule")
   tickets              Ticket[]
   tripSettlements      TripSettlement[]
+  busLogs              BusLog[]
 
   @@map("schedules")
 }
 
 model BusLog {
-  id         String    @id @default(uuid())
-  scheduleId String?   @map("schedule_id")
-  eventType  EventType @map("event_type")
-  timestamp  DateTime  @default(now())
-  locationId String?   @map("location_id")
-  loggedBy   String?   @map("logged_by")
-  location   Location? @relation(fields: [locationId], references: [id])
-  profile    Profile?  @relation(fields: [loggedBy], references: [id])
+  id         String   @id @default(uuid())
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id])
+  type       String
+  notes      String
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@map("bus_logs")
+  @@index([scheduleId])
+  @@index([profileId])
 }
 
 model Ticket {
@@ -262,7 +265,6 @@ model Location {
   active            Boolean  @default(true)
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @default(now()) @map("updated_at")
-  busLogs           BusLog[]
   destinationRoutes Route[]  @relation("DestinationRoutes")
   originRoutes      Route[]  @relation("OriginRoutes")
 

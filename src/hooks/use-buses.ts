@@ -39,9 +39,6 @@ export type BusFormData = {
 export function useBuses(isActive?: boolean) {
   const queryClient = useQueryClient();
 
-  // Inside the hook, convert the boolean to a string for the API call
-  const activeParam = isActive !== undefined ? isActive.toString() : undefined;
-
   // Fetch all buses (optionally filtered by company and template)
   const {
     data: buses = [],

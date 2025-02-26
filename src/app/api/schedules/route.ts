@@ -124,12 +124,16 @@ export async function POST(req: Request) {
     const schedule = await prisma.schedule.create({
       data: {
         routeScheduleId: data.routeScheduleId,
+        routeId: data.routeId || (await prisma.routeSchedule.findUnique({
+          where: { id: data.routeScheduleId },
+          select: { routeId: true }
+        }))?.routeId || "",
         busId: data.busId,
         primaryDriverId: data.primaryDriverId,
         secondaryDriverId: data.secondaryDriverId,
         departureDate: new Date(data.departureDate),
         estimatedArrivalTime: new Date(data.estimatedArrivalTime),
-        price: data.price || 0,
+        price: data.price,
         status: "scheduled",
       },
       include: {
