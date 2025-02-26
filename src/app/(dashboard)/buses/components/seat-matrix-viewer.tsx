@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SeatTier } from "@/hooks/use-seat-tiers";
+import { getTierColor } from "@/hooks/use-seat-tiers";
 import type { BusSeat } from "@/hooks/use-bus-seats";
 import type { SeatMatrix, SeatMatrixFloor } from "@/hooks/use-bus-templates";
 import type { SeatStatus } from "@prisma/client";
@@ -42,6 +43,17 @@ export function SeatMatrixViewer({
 
     // Get tier abbreviation for display (first 2 chars)
     const tierAbbr = seatTier?.name ? seatTier.name.substring(0, 2) : "";
+    
+    // Get tier color
+    const tierIndex = seatTier ? seatTiers.findIndex(t => t.id === seatTier.id) : -1;
+    const tierColor = tierIndex >= 0 ? getTierColor(tierIndex, seatTiers.length) : "";
+    
+    // Custom styles for tier-colored seats
+    const customStyle = tierColor && seatStatus === "available" ? { 
+      backgroundColor: tierColor,
+      borderColor: `hsl(0, 100%, ${Math.max(30, Number.parseInt(tierColor.split('%')[0].split('hsl(0, 100%, ')[1]) - 20)}%)`,
+      color: 'white'
+    } : {};
 
     return (
       <div
@@ -53,10 +65,11 @@ export function SeatMatrixViewer({
           !seat.isEmpty &&
             seatTier &&
             seatStatus === "available" &&
-            "bg-white border-primary text-primary",
+            !tierColor && "bg-white border-primary text-primary",
           seatStatus === "maintenance" &&
             "bg-gray-200 border-gray-500 text-gray-700"
         )}
+        style={customStyle}
         title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""} (${seatStatus})`}
       >
         {!seat.isEmpty && (
@@ -117,9 +130,15 @@ export function SeatMatrixViewer({
       <div className="mt-6 space-y-2">
         <h4 className="text-sm font-medium">Leyenda</h4>
         <div className="flex flex-wrap gap-3">
-          {seatTiers.map((tier) => (
+          {seatTiers.map((tier, index) => (
             <div key={tier.id} className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
+              <div 
+                className="w-4 h-4 rounded-sm" 
+                style={{ 
+                  backgroundColor: getTierColor(index, seatTiers.length),
+                  border: `1px solid ${getTierColor(index, seatTiers.length)}`,
+                }}
+              />
               <span className="text-sm">{tier.name}</span>
             </div>
           ))}

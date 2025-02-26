@@ -168,4 +168,20 @@ export function useSeatTiers(companyId?: string, fetchInactive = false) {
     isUpdating: updateSeatTier.isPending,
     isDeleting: deleteSeatTier.isPending,
   };
+}
+
+// Generate a color from the red gradient based on tier index
+export function getTierColor(tierIndex: number, totalTiers: number): string {
+  // Base red color with varying intensity
+  const baseHue = 0; // Red hue
+  const baseSaturation = 85; // Slightly less saturated for a softer look
+  
+  // Calculate lightness based on tier index (50% to 75% range)
+  // Higher tier = darker red (lower lightness)
+  const minLightness = 50;
+  const maxLightness = 75;
+  const step = totalTiers > 1 ? (maxLightness - minLightness) / (totalTiers - 1) : 0;
+  const lightness = maxLightness - (tierIndex * step);
+  
+  return `hsl(${baseHue}, ${baseSaturation}%, ${lightness}%)`;
 } 

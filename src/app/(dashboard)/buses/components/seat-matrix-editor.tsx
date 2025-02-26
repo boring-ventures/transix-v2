@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { SeatStatus } from "@prisma/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { getTierColor } from "@/hooks/use-seat-tiers";
 
 // Define an interface for the seat in the matrix
 interface MatrixSeat {
@@ -199,6 +200,17 @@ export function SeatMatrixEditor({
     
     // Get tier abbreviation for display (first 2 chars)
     const tierAbbr = seatTier?.name ? seatTier.name.substring(0, 2) : "";
+    
+    // Get tier color
+    const tierIndex = seatTier ? seatTiers.findIndex(t => t.id === seatTier.id) : -1;
+    const tierColor = tierIndex >= 0 ? getTierColor(tierIndex, seatTiers.length) : "";
+    
+    // Custom styles for tier-colored seats
+    const customStyle = tierColor && seatStatus === "available" ? { 
+      backgroundColor: tierColor,
+      borderColor: `hsl(0, 100%, ${Math.max(30, Number.parseInt(tierColor.split('%')[0].split('hsl(0, 100%, ')[1]) - 20)}%)`,
+      color: 'white'
+    } : {};
 
     return (
       <button
@@ -214,11 +226,12 @@ export function SeatMatrixEditor({
           !seat.isEmpty &&
             seatTier &&
             seatStatus === "available" &&
-            "bg-white border-primary text-primary hover:bg-primary/10",
+            !tierColor && "bg-white border-primary text-primary hover:bg-primary/10",
           seatStatus === "maintenance" &&
             "bg-gray-200 border-gray-500 text-gray-700 hover:bg-gray-300",
           isSelected && "ring-2 ring-offset-1 ring-primary"
         )}
+        style={customStyle}
         title={`${seat.name}${seatTier ? ` - ${seatTier.name}` : ""}`}
         onClick={() => !seat.isEmpty && handleSeatClick(seat.id)}
         disabled={seat.isEmpty}
@@ -389,9 +402,15 @@ export function SeatMatrixEditor({
       <div className="mt-6 space-y-2">
         <h4 className="text-sm font-medium">Leyenda</h4>
         <div className="flex flex-wrap gap-3">
-          {seatTiers.map((tier) => (
+          {seatTiers.map((tier, index) => (
             <div key={tier.id} className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-white border border-primary rounded-sm" />
+              <div 
+                className="w-4 h-4 rounded-sm" 
+                style={{ 
+                  backgroundColor: getTierColor(index, seatTiers.length),
+                  border: `1px solid ${getTierColor(index, seatTiers.length)}`,
+                }}
+              />
               <span className="text-sm">{tier.name}</span>
             </div>
           ))}

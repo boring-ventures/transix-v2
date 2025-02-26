@@ -65,9 +65,6 @@ export function EditBusForm({ bus }: EditBusFormProps) {
   const { seats, isUpdatingSeats } = useBusSeats(bus.id);
   const { seatTiers } = useSeatTiers(bus.companyId);
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(
-    bus.companyId
-  );
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("details");
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
@@ -100,17 +97,8 @@ export function EditBusForm({ bus }: EditBusFormProps) {
     }
   }, [bus, form]);
 
-  // Filter templates by company
-  const filteredTemplates = templates.filter(
-    (template: BusTemplate) =>
-      !selectedCompanyId || template.companyId === selectedCompanyId
-  );
-
-  // Handle company change
   const handleCompanyChange = (value: string) => {
-    setSelectedCompanyId(value);
     form.setValue("companyId", value);
-    form.setValue("templateId", ""); // Reset template when company changes
   };
 
   const onSubmit = async (data: EditBusFormValues) => {
@@ -457,9 +445,9 @@ export function EditBusForm({ bus }: EditBusFormProps) {
                         <FormItem>
                           <FormLabel>Plantilla</FormLabel>
                           <Select
+                            disabled={true}
                             onValueChange={field.onChange}
                             defaultValue={field.value}
-                            disabled={!selectedCompanyId}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -467,20 +455,21 @@ export function EditBusForm({ bus }: EditBusFormProps) {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {filteredTemplates.map(
-                                (template: BusTemplate) => (
-                                  <SelectItem
-                                    key={template.id}
-                                    value={template.id}
-                                  >
-                                    {template.name} ({template.totalCapacity}{" "}
-                                    asientos)
-                                  </SelectItem>
-                                )
-                              )}
+                              {templates.map((template: BusTemplate) => (
+                                <SelectItem
+                                  key={template.id}
+                                  value={template.id}
+                                >
+                                  {template.name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            La plantilla no se puede cambiar después de crear el
+                            bus.
+                          </p>
                         </FormItem>
                       )}
                     />
