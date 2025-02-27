@@ -16,6 +16,8 @@ export type Route = {
   updatedAt: string;
   origin?: Location;
   destination?: Location;
+  originLocation?: { id: string; name: string };
+  destinationLocation?: { id: string; name: string };
   _count?: {
     assignments: number;
     routeSchedules: number;
@@ -47,7 +49,7 @@ export function useRoutes(fetchInactive = false) {
   // Fetch all routes
   const {
     data: routes = [],
-    isLoading: isLoadingRoutes,
+    isLoading,
     error: routesError,
     refetch: refetchRoutes,
   } = useQuery({
@@ -55,13 +57,14 @@ export function useRoutes(fetchInactive = false) {
     queryFn: async () => {
       let url = "/api/routes";
       const params = new URLSearchParams();
-      
+
       if (!fetchInactive) params.append("active", "true");
-      
+      params.append("include", "originLocation,destinationLocation");
+
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
-      
+
       const response = await axios.get(url);
       return response.data.routes;
     },
@@ -97,7 +100,7 @@ export function useRoutes(fetchInactive = false) {
         axios.isAxiosError(error) && error.response?.data?.error
           ? error.response.data.error
           : "Error al crear la ruta";
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -124,7 +127,7 @@ export function useRoutes(fetchInactive = false) {
         axios.isAxiosError(error) && error.response?.data?.message
           ? error.response.data.message
           : "Error al actualizar la ruta";
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -151,7 +154,7 @@ export function useRoutes(fetchInactive = false) {
         axios.isAxiosError(error) && error.response?.data?.message
           ? error.response.data.message
           : "Error al desactivar la ruta";
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -178,7 +181,7 @@ export function useRoutes(fetchInactive = false) {
         axios.isAxiosError(error) && error.response?.data?.message
           ? error.response.data.message
           : "Error al eliminar la ruta";
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -188,21 +191,30 @@ export function useRoutes(fetchInactive = false) {
   });
 
   // Search routes
-  const searchRoutes = useCallback(async (query: string, options?: { originId?: string; destinationId?: string; limit?: number }) => {
-    const params = new URLSearchParams();
-    
-    if (query) params.append("q", query);
-    if (options?.originId) params.append("originId", options.originId);
-    if (options?.destinationId) params.append("destinationId", options.destinationId);
-    if (options?.limit) params.append("limit", options.limit.toString());
-    
-    const response = await axios.get(`/api/routes/search?${params.toString()}`);
-    return response.data.routes;
-  }, []);
+  const searchRoutes = useCallback(
+    async (
+      query: string,
+      options?: { originId?: string; destinationId?: string; limit?: number }
+    ) => {
+      const params = new URLSearchParams();
+
+      if (query) params.append("q", query);
+      if (options?.originId) params.append("originId", options.originId);
+      if (options?.destinationId)
+        params.append("destinationId", options.destinationId);
+      if (options?.limit) params.append("limit", options.limit.toString());
+
+      const response = await axios.get(
+        `/api/routes/search?${params.toString()}`
+      );
+      return response.data.routes;
+    },
+    []
+  );
 
   return {
     routes,
-    isLoadingRoutes,
+    isLoading,
     routesError,
     refetchRoutes,
     fetchRoute,

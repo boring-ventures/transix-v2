@@ -47,7 +47,7 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: "Vender Tickets",
-              url: "/tickets/sell",
+              url: "/tickets/sales",
               icon: ShoppingCart,
             },
             {

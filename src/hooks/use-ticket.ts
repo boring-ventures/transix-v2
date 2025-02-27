@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import type { Ticket, TicketStatus } from "@prisma/client";
 
 interface TicketWithRelations extends Ticket {
@@ -67,7 +67,6 @@ export function useTicket(ticketId?: string) {
   const [ticket, setTicket] = useState<TicketWithRelations | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const fetchTicket = useCallback(async (id: string) => {
     setIsLoading(true);
     setError(null);
@@ -85,7 +84,11 @@ export function useTicket(ticketId?: string) {
       return data.ticket;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      toast.error("Failed to load ticket details");
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al cargar los detalles del ticket",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsLoading(false);
@@ -119,11 +122,18 @@ export function useTicket(ticketId?: string) {
       
       const data = await response.json();
       setTicket(data.ticket);
-      toast.success("Ticket updated successfully");
+      toast({
+        title: "Ticket actualizado",
+        description: "Ticket actualizado exitosamente",
+      });
       return data.ticket;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      toast.error(err instanceof Error ? err.message : "Failed to update ticket");
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al actualizar el ticket",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsLoading(false);
@@ -162,11 +172,18 @@ export function useTicket(ticketId?: string) {
         });
       }
       
-      toast.success("Ticket cancelled successfully");
+      toast({
+        title: "Ticket cancelado",
+        description: "Ticket cancelado exitosamente",
+      });
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      toast.error(err instanceof Error ? err.message : "Failed to cancel ticket");
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al cancelar el ticket",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsLoading(false);
@@ -203,11 +220,18 @@ export function useTicket(ticketId?: string) {
       // Fetch the updated ticket to get all the relations
       await fetchTicket(id);
       
-      toast.success("Ticket reassigned successfully");
+      toast({
+        title: "Ticket reasignado",
+        description: "Ticket reasignado exitosamente",
+      });
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      toast.error(err instanceof Error ? err.message : "Failed to reassign ticket");
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al reasignar el ticket",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsLoading(false);

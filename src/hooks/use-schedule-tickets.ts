@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import type { Ticket } from "@prisma/client";
 
 interface TicketWithRelations extends Ticket {
@@ -51,7 +51,11 @@ export function useScheduleTickets(scheduleId?: string) {
       return { tickets: data.tickets, stats: data.stats };
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      toast.error("Failed to load schedule tickets");
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al cargar los tickets del horario",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsLoading(false);
@@ -100,11 +104,18 @@ export function useScheduleTickets(scheduleId?: string) {
         });
       }
       
-      toast.success("Ticket created successfully");
+      toast({
+        title: "Ticket creado",
+        description: "Ticket creado exitosamente",
+      });
       return data.ticket;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      toast.error(err instanceof Error ? err.message : "Failed to create ticket");
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al crear el ticket",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsLoading(false);
@@ -148,11 +159,18 @@ export function useScheduleTickets(scheduleId?: string) {
         });
       }
       
-      toast.success("Ticket cancelled successfully");
+      toast({
+        title: "Ticket cancelado",
+        description: "Ticket cancelado exitosamente",
+      });
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
-      toast.error(err instanceof Error ? err.message : "Failed to cancel ticket");
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al cancelar el ticket",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsLoading(false);
