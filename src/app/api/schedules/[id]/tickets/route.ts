@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { TicketStatus } from "@prisma/client";
 
-// Get all tickets for a schedule
+// Get all tickets for a specific schedule
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -11,25 +11,25 @@ export async function GET(
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-
+    
     // Check if schedule exists
     const schedule = await prisma.schedule.findUnique({
       where: { id },
     });
-
+    
     if (!schedule) {
       return NextResponse.json(
         { error: "Schedule not found" },
         { status: 404 }
       );
     }
-
+    
     // Build where clause
     const whereClause = {
       scheduleId: id,
-      ...(status ? { status: status as TicketStatus } : {}),
+      ...(status ? { status } : {}),
     };
-
+    
     // Get tickets
     const tickets = await prisma.ticket.findMany({
       where: whereClause,
@@ -46,8 +46,25 @@ export async function GET(
         purchasedAt: "desc",
       },
     });
-
-    return NextResponse.json({ tickets });
+    
+    // Get seat occupancy statistics
+    const totalSeats = await prisma.busSeat.count({
+      where: {
+        busId: schedule.busId,
+      },
+    });
+    
+    const occupiedSeats = tickets.filter(ticket => ticket.status === "active").length;
+    
+    return NextResponse.json({
+      tickets,
+      stats: {
+        totalSeats,
+        occupiedSeats,
+        availableSeats: totalSeats - occupiedSeats,
+        occupancyRate: totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0,
+      },
+    });
   } catch (error) {
     console.error("Error fetching schedule tickets:", error);
     return NextResponse.json(
