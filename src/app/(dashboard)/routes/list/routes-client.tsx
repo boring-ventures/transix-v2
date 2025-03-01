@@ -13,7 +13,7 @@ import { EditRouteDialog } from "../components/edit-route-dialog";
 
 export default function RoutesClient() {
   const router = useRouter();
-  const { routes, isLoadingRoutes } = useRoutes();
+  const { routes, isLoading } = useRoutes();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [routeToEdit, setRouteToEdit] = useState<Route | null>(null);
   const [routeToDelete, setRouteToDelete] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export default function RoutesClient() {
 
   return (
     <div className="container mx-auto py-6">
-      {isLoadingRoutes ? (
+      {isLoading ? (
         <LoadingTable columnCount={5} rowCount={5} />
       ) : (
         <DataTable

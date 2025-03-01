@@ -10,7 +10,7 @@ export async function GET(
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
+    const status = searchParams.get("status") as TicketStatus | null;
     
     // Check if schedule exists
     const schedule = await prisma.schedule.findUnique({
