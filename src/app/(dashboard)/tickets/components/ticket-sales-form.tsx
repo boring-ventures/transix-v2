@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 
 // Dummy data based on Prisma schema
@@ -114,10 +113,6 @@ export default function TicketSalesForm() {
   })
 
   // Selected data
-  const selectedRoute = routes.find(
-    (route) => route.originId === formData.originId && route.destinationId === formData.destinationId,
-  )
-
   const availableSchedules = schedules.filter((schedule) =>
     routes.some(
       (route) =>
@@ -128,8 +123,6 @@ export default function TicketSalesForm() {
   )
 
   const selectedSchedule = schedules.find((schedule) => schedule.id === formData.scheduleId)
-
-  const availableSeats = seats.filter((seat) => seat.status === "available")
 
   const [expandedPassenger, setExpandedPassenger] = useState<string | null>(null)
 
@@ -248,7 +241,7 @@ export default function TicketSalesForm() {
           description="Seleccione origen y destino"
           icon={<MapPin className="h-5 w-5" />}
           active={currentStep === "route"}
-          completed={currentStep !== "route" && formData.originId && formData.destinationId}
+          completed={!!(currentStep !== "route" && formData.originId && formData.destinationId)}
           onClick={() => navigateToStep("route")}
         />
         <div className="h-px w-full max-w-12 bg-gray-200" />
@@ -257,7 +250,7 @@ export default function TicketSalesForm() {
           description="Elija fecha y hora"
           icon={<Clock className="h-5 w-5" />}
           active={currentStep === "schedule"}
-          completed={currentStep !== "route" && currentStep !== "schedule" && formData.scheduleId}
+          completed={!!(currentStep !== "route" && currentStep !== "schedule" && formData.scheduleId)}
           onClick={() => navigateToStep("schedule")}
         />
         <div className="h-px w-full max-w-12 bg-gray-200" />
@@ -498,8 +491,8 @@ export default function TicketSalesForm() {
                       value={expandedPassenger || undefined}
                       onValueChange={(value) => setExpandedPassenger(value)}
                     >
-                      {formData.passengers.map((passenger, index) => (
-                        <AccordionItem key={index} value={passenger.seatNumber}>
+                      {formData.passengers.map((passenger, index) => ( // eslint-disable-line @typescript-eslint/no-unused-vars
+                        <AccordionItem key={passenger.seatNumber} value={passenger.seatNumber}>
                           <AccordionTrigger className="hover:no-underline">
                             <div className="flex items-center justify-between w-full">
                               <span>
@@ -579,8 +572,8 @@ export default function TicketSalesForm() {
                 <div className="p-4 border rounded-md">
                   <h4 className="font-medium mb-2">Pasajeros</h4>
                   <div className="space-y-3">
-                    {formData.passengers.map((passenger, index) => (
-                      <div key={index} className="flex justify-between items-center py-2 border-b last:border-0">
+                    {formData.passengers.map((passenger, index) => ( // eslint-disable-line @typescript-eslint/no-unused-vars
+                      <div key={passenger.seatNumber} className="flex justify-between items-center py-2 border-b last:border-0">
                         <div>
                           <p className="font-medium">{passenger.fullName}</p>
                           <p className="text-sm text-muted-foreground">Doc: {passenger.documentId}</p>
@@ -623,16 +616,6 @@ export default function TicketSalesForm() {
                   </div>
                 </div>
 
-                <div className="p-4 border rounded-md">
-                  <div className="flex items-start space-x-2">
-                    <Checkbox id="terms" />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="terms" className="text-sm font-normal leading-snug">
-                        Acepto los términos y condiciones y la política de privacidad.
-                      </Label>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -671,7 +654,12 @@ interface StepIndicatorProps {
 
 function StepIndicator({ label, description, icon, active, completed, onClick }: StepIndicatorProps) {
   return (
-    <div className="flex flex-col items-center text-center cursor-pointer" onClick={onClick}>
+    <button 
+      type="button"
+      className="flex flex-col items-center text-center cursor-pointer bg-transparent border-0" 
+      onClick={onClick}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+    >
       <div
         className={cn(
           "w-10 h-10 rounded-full flex items-center justify-center mb-2",
@@ -686,7 +674,7 @@ function StepIndicator({ label, description, icon, active, completed, onClick }:
       </div>
       <span className="font-medium text-sm">{label}</span>
       <span className="text-xs text-muted-foreground max-w-[120px]">{description}</span>
-    </div>
+    </button>
   )
 }
 
