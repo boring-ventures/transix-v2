@@ -3,8 +3,8 @@ import { Separator } from "@/components/ui/separator";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
 import { useSchedules } from "@/hooks/use-schedules";
-import { useBusSeats } from "@/hooks/use-bus-seats";
-import type { Schedule } from "@/hooks/use-schedules";
+import type { Schedule, ScheduleAvailability } from "@/hooks/use-schedules";
+import axios from "axios";
 
 export function ReviewStep({
   formData,
@@ -15,43 +15,58 @@ export function ReviewStep({
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(
     null
   );
+  const [availabilityData, setAvailabilityData] =
+    useState<ScheduleAvailability | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch data from API
   const { locations } = useLocations();
-  const { schedules } = useSchedules();
+  const { fetchScheduleAvailability } = useSchedules();
 
-  // Fetch the selected schedule
+  // Fetch the selected schedule and its availability
   useEffect(() => {
-    const fetchSchedule = async () => {
+    const fetchScheduleData = async () => {
       if (!formData.scheduleId) return;
 
       setIsLoading(true);
+      setError(null);
 
       try {
-        // First try to find it in the already loaded schedules
-        const schedule = schedules.find((s) => s.id === formData.scheduleId);
-
-        if (schedule) {
-          setSelectedSchedule(schedule);
-        } else {
-          // If not found, fetch it directly
-          const response = await fetch(`/api/schedules/${formData.scheduleId}`);
-          const data = await response.json();
-          setSelectedSchedule(data.schedule);
+        // Fetch the schedule
+        const response = await fetch(`/api/schedules/${formData.scheduleId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch schedule: ${response.statusText}`);
         }
-      } catch (error) {
-        console.error("Error fetching schedule:", error);
+
+        const data = await response.json();
+        setSelectedSchedule(data.schedule);
+
+        // Fetch availability with debug info to get all seats
+        const availabilityResponse = await axios.get(
+          `/api/schedules/availability?scheduleId=${formData.scheduleId}&debug=true`
+        );
+        const availability = availabilityResponse.data;
+
+        setAvailabilityData(availability);
+      } catch (err) {
+        console.error("Error fetching schedule data:", err);
+        setError("Error al cargar los datos del viaje");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchSchedule();
-  }, [formData.scheduleId, schedules]);
+    fetchScheduleData();
+  }, [formData.scheduleId]);
 
-  // Fetch bus seats for the selected schedule
-  const { seats: busSeats = [] } = useBusSeats(selectedSchedule?.busId);
+  // Get all seats (including selected ones that might not be available)
+  const allSeats = availabilityData?.debug?.allSeats || [];
+
+  // Find selected seats from all seats
+  const selectedSeats = allSeats.filter((seat) =>
+    formData.selectedSeats.includes(seat.id)
+  );
 
   // Get location names
   const originName = locations.find((l) => l.id === formData.originId)?.name;
@@ -59,10 +74,23 @@ export function ReviewStep({
     (l) => l.id === formData.destinationId
   )?.name;
 
+  // Show loading state
   if (isLoading) {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-destructive mb-4">{error}</p>
+        <p className="text-muted-foreground">
+          Por favor, intente nuevamente o seleccione otro horario.
+        </p>
       </div>
     );
   }
@@ -131,7 +159,7 @@ export function ReviewStep({
               <p>
                 $
                 {formData.selectedSeats.reduce((total, seatId) => {
-                  const seat = busSeats.find((s) => s.id === seatId);
+                  const seat = selectedSeats.find((s) => s.id === seatId);
                   return total + (seat?.tier?.basePrice || 0);
                 }, 0)}
               </p>

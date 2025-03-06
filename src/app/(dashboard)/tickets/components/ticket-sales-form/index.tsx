@@ -172,8 +172,8 @@ export default function TicketSalesForm() {
     // Base price is the schedule price times the number of passengers
     const basePrice = selectedSchedule.price * formData.selectedSeats.length;
 
-    // Additional fees could be added here based on seat tiers
-    // This would require fetching the seat tier information
+    // We don't have access to seat tier prices here, so we'll just use the base price
+    // The actual seat tier prices will be calculated in the seats-step and review-step components
 
     return basePrice;
   };
