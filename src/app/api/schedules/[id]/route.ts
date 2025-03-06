@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { ScheduleStatus } from "@prisma/client";
+import { getProfileIdFromUserId } from "@/lib/auth-utils";
 
 // Get a specific schedule by ID
 export async function GET(
@@ -130,13 +131,23 @@ export async function PATCH(
       },
     });
 
+    // Get the profile ID associated with the authenticated user
+    const profileId = await getProfileIdFromUserId(session.user.id);
+
+    if (!profileId) {
+      return NextResponse.json(
+        { error: "Perfil de usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
     // Create a log entry for this update
     await prisma.busLog.create({
       data: {
         scheduleId: id,
         type: "SCHEDULE_UPDATED",
         notes: "Información del viaje actualizada",
-        profileId: session.user.id,
+        profileId: profileId,
       },
     });
 
@@ -197,13 +208,23 @@ export async function DELETE(
       },
     });
 
+    // Get the profile ID associated with the authenticated user
+    const profileId = await getProfileIdFromUserId(session.user.id);
+
+    if (!profileId) {
+      return NextResponse.json(
+        { error: "Perfil de usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
     // Create a log entry for this cancellation
     await prisma.busLog.create({
       data: {
         scheduleId: id,
         type: "SCHEDULE_CANCELLED",
         notes: "El viaje ha sido cancelado",
-        profileId: session.user.id,
+        profileId: profileId,
       },
     });
 

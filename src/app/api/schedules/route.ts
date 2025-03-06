@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, ScheduleStatus } from "@prisma/client";
+import { getProfileIdFromUserId } from "@/lib/auth-utils";
 
 // Get all schedules with optional filtering
 export async function GET(req: Request) {
@@ -32,9 +33,8 @@ export async function GET(req: Request) {
     const whereClause: Prisma.ScheduleWhereInput = {};
 
     if (routeId) {
-      whereClause.routeSchedule = {
-        routeId,
-      };
+      // Check if we should filter by routeId directly or through routeSchedule
+      whereClause.OR = [{ routeId }, { routeSchedule: { routeId } }];
     }
 
     if (busId) whereClause.busId = busId;
@@ -124,10 +124,15 @@ export async function POST(req: Request) {
     const schedule = await prisma.schedule.create({
       data: {
         routeScheduleId: data.routeScheduleId,
-        routeId: data.routeId || (await prisma.routeSchedule.findUnique({
-          where: { id: data.routeScheduleId },
-          select: { routeId: true }
-        }))?.routeId || "",
+        routeId:
+          data.routeId ||
+          (
+            await prisma.routeSchedule.findUnique({
+              where: { id: data.routeScheduleId },
+              select: { routeId: true },
+            })
+          )?.routeId ||
+          "",
         busId: data.busId,
         primaryDriverId: data.primaryDriverId,
         secondaryDriverId: data.secondaryDriverId,
@@ -148,13 +153,23 @@ export async function POST(req: Request) {
       },
     });
 
+    // Get the profile ID associated with the authenticated user
+    const profileId = await getProfileIdFromUserId(session.user.id);
+
+    if (!profileId) {
+      return NextResponse.json(
+        { error: "Perfil de usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
     // Create a log entry for this new schedule
     await prisma.busLog.create({
       data: {
         scheduleId: schedule.id,
         type: "SCHEDULE_CREATED",
         notes: "Nuevo viaje creado",
-        profileId: session.user.id,
+        profileId: profileId,
       },
     });
 

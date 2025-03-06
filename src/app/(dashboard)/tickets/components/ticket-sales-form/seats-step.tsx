@@ -13,6 +13,7 @@ import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useBusSeats } from "@/hooks/use-bus-seats";
+import type { Schedule } from "@/hooks/use-schedules";
 
 export function SeatsStep({
   formData,
@@ -24,13 +25,34 @@ export function SeatsStep({
   const [expandedPassenger, setExpandedPassenger] = useState<string | null>(
     null
   );
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(
+    null
+  );
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
 
   // Fetch data from API
   const { locations } = useLocations();
-  const { schedules } = useSchedules();
-  const selectedSchedule = schedules.find(
-    (schedule) => schedule.id === formData.scheduleId
-  );
+
+  // Fetch the selected schedule
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      if (!formData.scheduleId) return;
+
+      setIsLoadingSchedule(true);
+
+      try {
+        const response = await fetch(`/api/schedules/${formData.scheduleId}`);
+        const data = await response.json();
+        setSelectedSchedule(data.schedule);
+      } catch (error) {
+        console.error("Error fetching schedule:", error);
+      } finally {
+        setIsLoadingSchedule(false);
+      }
+    };
+
+    fetchSchedule();
+  }, [formData.scheduleId]);
 
   // Fetch bus seats for the selected schedule
   const { seats: busSeats = [], isLoading: isLoadingSeats } = useBusSeats(

@@ -31,15 +31,13 @@ export default function TicketSalesForm() {
   // Fetch data using hooks
   const { locations, isLoadingLocations } = useLocations();
   const { routes, isLoading: isLoadingRoutes } = useRoutes();
-  const { schedules, isLoading: isLoadingSchedules } = useSchedules({
-    routeId:
-      formData.originId && formData.destinationId
-        ? routes.find(
-            (r) =>
-              r.originId === formData.originId &&
-              r.destinationId === formData.destinationId
-          )?.id
-        : undefined,
+
+  // We'll get the schedules from the ScheduleStep component
+  // so we don't need to fetch them here
+
+  // Get selected schedule from the scheduleId
+  const { schedules } = useSchedules({
+    status: "scheduled",
   });
 
   // Get selected schedule

@@ -1,104 +1,108 @@
 import { NextResponse } from "next/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
-import type { Schedule, Location } from "@prisma/client";
-// Define a proper type for the schedule with availability
-type ScheduleWithAvailability = Schedule & {
-  availableSeats: number;
-  totalSeats: number;
-  hasEnoughSeats: boolean;
-  _count: {
-    tickets: number;
-  };
-  bus: {
-    id: string;
-    plateNumber: string;
-    template?: {
-      id: string;
-      name: string;
-      type: string;
-    };
-  } | null;
-  routeSchedule: {
-    route: {
-      origin: Location;
-      destination: Location;
-    };
-  };
-};
+import type { ScheduleStatus } from "@prisma/client";
 
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(request.url);
+    // Get the Supabase client
+    const supabase = createRouteHandlerClient({ cookies });
+
+    // Check authentication
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
     const originId = searchParams.get("originId");
     const destinationId = searchParams.get("destinationId");
-    const departureDate = searchParams.get("departureDate");
-    const returnDate = searchParams.get("returnDate");
-    const passengers = Number.parseInt(searchParams.get("passengers") || "1");
+    const status = searchParams.get("status") as ScheduleStatus | null;
+    const fromDate = searchParams.get("fromDate");
+    const toDate = searchParams.get("toDate");
 
-    if (!originId || !destinationId || !departureDate) {
+    // Validate required parameters
+    if (!originId || !destinationId) {
       return NextResponse.json(
-        { error: "Origin, destination, and departure date are required" },
+        { error: "Se requieren los parámetros originId y destinationId" },
         { status: 400 }
       );
     }
 
-    // Parse dates
-    const departureDateObj = new Date(departureDate);
-    departureDateObj.setHours(0, 0, 0, 0);
-
-    const nextDay = new Date(departureDateObj);
-    nextDay.setDate(nextDay.getDate() + 1);
-
-    // Build where clause for outbound journey
-    const outboundWhereClause: Prisma.ScheduleWhereInput = {
-      routeSchedule: {
-        route: {
-          originId,
-          destinationId,
-        },
+    // Find routes that match the origin and destination
+    const routes = await prisma.route.findMany({
+      where: {
+        originId,
+        destinationId,
+        active: true,
       },
-      departureDate: {
-        gte: departureDateObj,
-        lt: nextDay,
+      select: {
+        id: true,
       },
-      status: "scheduled",
+    });
+
+    if (routes.length === 0) {
+      return NextResponse.json({ schedules: [] });
+    }
+
+    const routeIds = routes.map((route) => route.id);
+
+    // Build the query for schedules
+    const whereClause: {
+      OR: Array<
+        | { routeId: { in: string[] } }
+        | { routeSchedule: { routeId: { in: string[] } } }
+      >;
+      status?: ScheduleStatus;
+      departureDate?: {
+        gte?: Date;
+        lte?: Date;
+      };
+    } = {
+      OR: [
+        { routeId: { in: routeIds } },
+        { routeSchedule: { routeId: { in: routeIds } } },
+      ],
     };
 
-    // Get outbound schedules
-    const outboundSchedules = await prisma.schedule.findMany({
-      where: outboundWhereClause,
+    // Add additional filters
+    if (status) {
+      whereClause.status = status;
+    }
+
+    if (fromDate) {
+      whereClause.departureDate = {
+        ...(whereClause.departureDate || {}),
+        gte: new Date(fromDate),
+      };
+    }
+
+    if (toDate) {
+      whereClause.departureDate = {
+        ...(whereClause.departureDate || {}),
+        lte: new Date(toDate),
+      };
+    }
+
+    // Fetch schedules
+    const schedules = await prisma.schedule.findMany({
+      where: whereClause,
       include: {
-        bus: {
-          select: {
-            id: true,
-            plateNumber: true,
-            template: {
-              select: {
-                id: true,
-                name: true,
-                type: true,
-              },
-            },
-          },
-        },
+        bus: true,
+        primaryDriver: true,
+        secondaryDriver: true,
         routeSchedule: {
           include: {
-            route: {
-              include: {
-                origin: true,
-                destination: true,
-              },
-            },
+            route: true,
           },
         },
         _count: {
           select: {
-            tickets: {
-              where: {
-                status: "active",
-              },
-            },
+            tickets: true,
+            parcels: true,
           },
         },
       },
@@ -107,137 +111,11 @@ export async function GET(request: Request) {
       },
     });
 
-    // Calculate available seats for each schedule
-    const outboundWithAvailability = await Promise.all(
-      outboundSchedules.map(async (schedule) => {
-        const totalSeats = await prisma.busSeat.count({
-          where: {
-            busId: schedule.busId || "",
-            isActive: true,
-            status: "available",
-          },
-        });
-
-        const bookedSeats = schedule._count.tickets;
-        const availableSeats = totalSeats - bookedSeats;
-
-        return {
-          ...schedule,
-          availableSeats,
-          totalSeats,
-          hasEnoughSeats: availableSeats >= passengers,
-        };
-      })
-    );
-
-    // Filter schedules with enough seats
-    const availableOutboundSchedules = outboundWithAvailability.filter(
-      (schedule) => schedule.hasEnoughSeats
-    );
-
-    // If return date is provided, search for return schedules
-    let availableReturnSchedules: ScheduleWithAvailability[] = [];
-    if (returnDate) {
-      const returnDateObj = new Date(returnDate);
-      returnDateObj.setHours(0, 0, 0, 0);
-
-      const returnNextDay = new Date(returnDateObj);
-      returnNextDay.setDate(returnNextDay.getDate() + 1);
-
-      // Build where clause for return journey
-      const returnWhereClause: Prisma.ScheduleWhereInput = {
-        routeSchedule: {
-          route: {
-            originId: destinationId,
-            destinationId: originId,
-          },
-        },
-        departureDate: {
-          gte: returnDateObj,
-          lt: returnNextDay,
-        },
-        status: "scheduled",
-      };
-
-      // Get return schedules
-      const returnSchedules = await prisma.schedule.findMany({
-        where: returnWhereClause,
-        include: {
-          bus: {
-            select: {
-              id: true,
-              plateNumber: true,
-              template: {
-                select: {
-                  id: true,
-                  name: true,
-                  type: true,
-                },
-              },
-            },
-          },
-          routeSchedule: {
-            include: {
-              route: {
-                include: {
-                  origin: true,
-                  destination: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              tickets: {
-                where: {
-                  status: "active",
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          departureDate: "asc",
-        },
-      });
-
-      // Calculate available seats for each return schedule
-      const returnWithAvailability = await Promise.all(
-        returnSchedules.map(async (schedule) => {
-          const totalSeats = await prisma.busSeat.count({
-            where: {
-              busId: schedule.busId || "",
-              isActive: true,
-              status: "available",
-            },
-          });
-
-          const bookedSeats = schedule._count.tickets;
-          const availableSeats = totalSeats - bookedSeats;
-
-          return {
-            ...schedule,
-            availableSeats,
-            totalSeats,
-            hasEnoughSeats: availableSeats >= passengers,
-          };
-        })
-      );
-
-      // Filter return schedules with enough seats
-      availableReturnSchedules = returnWithAvailability.filter(
-        (schedule) => schedule.hasEnoughSeats
-      );
-    }
-
-    return NextResponse.json({
-      outbound: availableOutboundSchedules,
-      return: availableReturnSchedules,
-    });
+    return NextResponse.json({ schedules });
   } catch (error) {
     console.error("Error searching schedules:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Error al buscar los viajes programados" },
       { status: 500 }
     );
   }

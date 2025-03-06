@@ -257,7 +257,9 @@ export function useSchedules({
   // Fetch a single schedule by ID
   const fetchSchedule = useCallback(async (id: string) => {
     try {
-      const response = await axios.get(`/api/schedules/${id}?include=route,bus,primaryDriver,secondaryDriver,tickets,parcels,logs`);
+      const response = await axios.get(
+        `/api/schedules/${id}?include=route,bus,primaryDriver,secondaryDriver,tickets,parcels,logs`
+      );
       return response.data.schedule;
     } catch (error) {
       console.error("Error fetching schedule:", error);
@@ -334,7 +336,9 @@ export function useSchedules({
       id: string;
       status: ScheduleStatus;
     }) => {
-      const response = await axios.patch(`/api/schedules/${id}/status`, { status });
+      const response = await axios.patch(`/api/schedules/${id}/status`, {
+        status,
+      });
       return response.data.schedule;
     },
     onSuccess: () => {
@@ -601,6 +605,37 @@ export function useSchedules({
     return response.data;
   }, []);
 
+  // Search schedules by origin and destination
+  const searchSchedulesByRoute = useCallback(
+    async ({
+      originId,
+      destinationId,
+      status,
+      fromDate,
+      toDate,
+    }: {
+      originId: string;
+      destinationId: string;
+      status?: ScheduleStatus;
+      fromDate?: string;
+      toDate?: string;
+    }) => {
+      const params = new URLSearchParams();
+      params.append("originId", originId);
+      params.append("destinationId", destinationId);
+
+      if (status) params.append("status", status);
+      if (fromDate) params.append("fromDate", fromDate);
+      if (toDate) params.append("toDate", toDate);
+
+      const response = await axios.get(
+        `/api/schedules/search?${params.toString()}`
+      );
+      return response.data.schedules;
+    },
+    []
+  );
+
   return {
     schedules,
     isLoadingSchedules,
@@ -621,6 +656,7 @@ export function useSchedules({
     generatePassengerList,
     fetchScheduleAvailability,
     searchSchedules,
+    searchSchedulesByRoute,
     isCreating: createSchedule.isPending,
     isUpdating: updateSchedule.isPending,
     isUpdatingStatus: updateScheduleStatus.isPending,

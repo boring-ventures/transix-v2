@@ -1,10 +1,11 @@
+import { useState, useEffect } from "react";
 import { ChevronRight } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
-import { useRoutes } from "@/hooks/use-routes";
 import { useSchedules } from "@/hooks/use-schedules";
+import type { Schedule } from "@/hooks/use-schedules";
 
 export function ScheduleStep({
   formData,
@@ -12,23 +13,43 @@ export function ScheduleStep({
   formatDate,
   formatTime,
 }: StepComponentProps) {
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   // Fetch data from API
   const { locations } = useLocations();
-  const { routes } = useRoutes();
+  const { searchSchedulesByRoute } = useSchedules();
 
-  // Find the route based on origin and destination
-  const selectedRoute = routes.find(
-    (route) =>
-      route.originId === formData.originId &&
-      route.destinationId === formData.destinationId
-  );
+  // Fetch schedules when origin and destination change
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      if (!formData.originId || !formData.destinationId) return;
 
-  // Fetch schedules for the selected route
-  const { schedules, isLoading: isLoadingSchedules } = useSchedules({
-    routeId: selectedRoute?.id,
-    status: "scheduled", // Only show scheduled trips
-    fromDate: new Date().toISOString(), // Only future trips
-  });
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await searchSchedulesByRoute({
+          originId: formData.originId,
+          destinationId: formData.destinationId,
+          status: "scheduled",
+          fromDate: new Date().toISOString(),
+        });
+
+        console.log("Fetched schedules:", result);
+        setSchedules(result || []);
+      } catch (err) {
+        console.error("Error fetching schedules:", err);
+        setError("Error al cargar los horarios disponibles");
+        setSchedules([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSchedules();
+  }, [formData.originId, formData.destinationId, searchSchedulesByRoute]);
 
   // Get location names
   const originName = locations.find((l) => l.id === formData.originId)?.name;
@@ -36,7 +57,8 @@ export function ScheduleStep({
     (l) => l.id === formData.destinationId
   )?.name;
 
-  if (isLoadingSchedules) {
+  // Show loading state
+  if (isLoading) {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -50,10 +72,17 @@ export function ScheduleStep({
         {originName} - {destinationName}
       </h3>
 
+      {error && <p className="text-destructive">{error}</p>}
+
       {schedules.length === 0 ? (
-        <p className="text-muted-foreground">
-          No hay horarios disponibles para esta ruta.
-        </p>
+        <div className="space-y-4">
+          <p className="text-muted-foreground">
+            No hay horarios disponibles para esta ruta.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Origen: {formData.originId}, Destino: {formData.destinationId}
+          </p>
+        </div>
       ) : (
         <RadioGroup
           value={formData.scheduleId}

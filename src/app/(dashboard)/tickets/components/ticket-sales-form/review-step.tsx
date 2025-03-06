@@ -1,8 +1,10 @@
+import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useBusSeats } from "@/hooks/use-bus-seats";
+import type { Schedule } from "@/hooks/use-schedules";
 
 export function ReviewStep({
   formData,
@@ -10,12 +12,43 @@ export function ReviewStep({
   formatTime,
   calculateTotalPrice,
 }: StepComponentProps) {
+  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState(false);
+
   // Fetch data from API
   const { locations } = useLocations();
   const { schedules } = useSchedules();
-  const selectedSchedule = schedules.find(
-    (schedule) => schedule.id === formData.scheduleId
-  );
+
+  // Fetch the selected schedule
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      if (!formData.scheduleId) return;
+
+      setIsLoading(true);
+
+      try {
+        // First try to find it in the already loaded schedules
+        const schedule = schedules.find((s) => s.id === formData.scheduleId);
+
+        if (schedule) {
+          setSelectedSchedule(schedule);
+        } else {
+          // If not found, fetch it directly
+          const response = await fetch(`/api/schedules/${formData.scheduleId}`);
+          const data = await response.json();
+          setSelectedSchedule(data.schedule);
+        }
+      } catch (error) {
+        console.error("Error fetching schedule:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSchedule();
+  }, [formData.scheduleId, schedules]);
 
   // Fetch bus seats for the selected schedule
   const { seats: busSeats = [] } = useBusSeats(selectedSchedule?.busId);
@@ -25,6 +58,14 @@ export function ReviewStep({
   const destinationName = locations.find(
     (l) => l.id === formData.destinationId
   )?.name;
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
