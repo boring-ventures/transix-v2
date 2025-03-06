@@ -42,13 +42,47 @@ export async function GET(req: Request) {
       );
     }
 
-    // Get all seats for the bus
-    const allSeats = await prisma.busSeat.findMany({
-      where: {
-        busId: schedule.busId,
-      },
+    // Check if schedule seats exist
+    const scheduleSeatsCount = await prisma.scheduleSeat.count({
+      where: { scheduleId },
+    });
+
+    const hasScheduleSeats = scheduleSeatsCount > 0;
+
+    // If no schedule seats exist, create them
+    if (!hasScheduleSeats) {
+      // Get all seats for the bus
+      const busSeats = await prisma.busSeat.findMany({
+        where: {
+          busId: schedule.busId,
+          isActive: true,
+        },
+      });
+
+      // Create schedule seats for each bus seat
+      if (busSeats.length > 0) {
+        for (const seat of busSeats) {
+          await prisma.scheduleSeat.create({
+            data: {
+              scheduleId,
+              busSeatId: seat.id,
+              status: seat.status,
+              isActive: seat.isActive,
+            },
+          });
+        }
+      }
+    }
+
+    // Get all schedule seats with their bus seats and tiers
+    const scheduleSeats = await prisma.scheduleSeat.findMany({
+      where: { scheduleId },
       include: {
-        tier: true,
+        busSeat: {
+          include: {
+            tier: true,
+          },
+        },
       },
     });
 
@@ -65,23 +99,29 @@ export async function GET(req: Request) {
 
     const bookedSeatIds = bookedTickets.map((ticket) => ticket.busSeatId);
 
-    // Filter out booked seats and maintenance seats
-    const availableSeats = allSeats.filter(
-      (seat) =>
-        !bookedSeatIds.includes(seat.id) &&
-        seat.isActive &&
-        seat.status === "available"
-    );
-
-    // If no seats are available, return all seats for debugging
-    const allSeatsWithStatus = allSeats.map((seat) => ({
-      ...seat,
-      isBooked: bookedSeatIds.includes(seat.id),
+    // Process seats for the response
+    const processedSeats = scheduleSeats.map((scheduleSeat) => ({
+      id: scheduleSeat.busSeatId,
+      status: scheduleSeat.status,
+      isActive: scheduleSeat.isActive,
+      seatNumber: scheduleSeat.busSeat.seatNumber,
+      tierId: scheduleSeat.busSeat.tierId,
+      isBooked: bookedSeatIds.includes(scheduleSeat.busSeatId),
       isAvailable:
-        seat.isActive &&
-        seat.status === "available" &&
-        !bookedSeatIds.includes(seat.id),
+        scheduleSeat.isActive &&
+        scheduleSeat.status === "available" &&
+        !bookedSeatIds.includes(scheduleSeat.busSeatId),
+      tier: scheduleSeat.busSeat.tier
+        ? {
+            id: scheduleSeat.busSeat.tier.id,
+            name: scheduleSeat.busSeat.tier.name,
+            basePrice: Number(scheduleSeat.busSeat.tier.basePrice),
+          }
+        : null,
     }));
+
+    // Filter out booked seats and maintenance seats for available seats
+    const availableSeats = processedSeats.filter((seat) => seat.isAvailable);
 
     // Group seats by tier
     const seatsByTier = availableSeats.reduce(
@@ -102,10 +142,11 @@ export async function GET(req: Request) {
       availableSeats,
       seatsByTier,
       totalAvailable: availableSeats.length,
-      totalCapacity: allSeats.length,
+      totalCapacity: processedSeats.length,
       occupancyRate:
-        allSeats.length > 0
-          ? (allSeats.length - availableSeats.length) / allSeats.length
+        processedSeats.length > 0
+          ? (processedSeats.length - availableSeats.length) /
+            processedSeats.length
           : 0,
     };
 
@@ -113,7 +154,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         ...response,
         debug: {
-          allSeats: allSeatsWithStatus,
+          allSeats: processedSeats,
           bookedSeatIds,
           busId: schedule.busId,
         },

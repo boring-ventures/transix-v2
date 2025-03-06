@@ -153,6 +153,24 @@ export async function POST(req: Request) {
       },
     });
 
+    // Get all seats for the bus
+    const busSeats = await prisma.busSeat.findMany({
+      where: {
+        busId: data.busId,
+        isActive: true,
+      },
+    });
+
+    // Create schedule seats for each bus seat
+    if (busSeats.length > 0) {
+      for (const seat of busSeats) {
+        await prisma.$executeRaw`
+          INSERT INTO "schedule_seats" ("schedule_id", "bus_seat_id", "status", "is_active", "created_at", "updated_at")
+          VALUES (${schedule.id}, ${seat.id}, ${seat.status}, ${seat.isActive}, NOW(), NOW())
+        `;
+      }
+    }
+
     // Get the profile ID associated with the authenticated user
     const profileId = await getProfileIdFromUserId(session.user.id);
 
