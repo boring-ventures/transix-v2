@@ -798,7 +798,7 @@ export function SeatsStep({
         </div>
 
         {/* Right side: Passenger details and summary */}
-        <div className="md:w-full lg:w-[350px] xl:w-[400px]">
+        <div className="md:w-full lg:w-[350px] xl:w-[400px] max-w-full">
           <div className="bg-muted p-4 rounded-md mb-4">
             <h4 className="font-medium mb-2">Resumen de selección</h4>
             <p>Asientos seleccionados: {formData.selectedSeats.length}</p>
@@ -815,7 +815,7 @@ export function SeatsStep({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto max-h-[500px] pr-1">
               {formData.passengers.map((passenger, index) => (
                 <div
                   key={passenger.seatNumber}
@@ -836,7 +836,9 @@ export function SeatsStep({
                         Asiento {passenger.seatNumber}
                       </span>
                       {passenger.fullName ? (
-                        <span className="text-sm">{passenger.fullName}</span>
+                        <span className="text-sm truncate max-w-[150px]">
+                          {passenger.fullName}
+                        </span>
                       ) : (
                         <span className="text-sm text-destructive">
                           Datos pendientes
@@ -844,7 +846,7 @@ export function SeatsStep({
                       )}
                     </div>
                     <div
-                      className="transform transition-transform duration-200"
+                      className="transform transition-transform duration-200 flex-shrink-0"
                       style={{
                         transform:
                           expandedPassenger === passenger.seatNumber
@@ -871,12 +873,12 @@ export function SeatsStep({
                   </div>
 
                   {expandedPassenger === passenger.seatNumber && (
-                    <div className="space-y-6 p-4 bg-card text-card-foreground">
+                    <div className="space-y-4 p-4 bg-card text-card-foreground">
                       {/* Document ID with search */}
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         <Label
                           htmlFor={`passenger-${index}-document`}
-                          className="text-base font-medium"
+                          className="text-sm font-medium"
                         >
                           Documento de Identidad
                         </Label>
@@ -889,11 +891,11 @@ export function SeatsStep({
                               handleDocumentIdChange(documentId, index);
                             }}
                             placeholder="Ingrese documento para buscar"
-                            className="h-12 text-base px-4"
+                            className="h-10 text-sm w-full"
                           />
                           {isSearching[index] && (
-                            <div className="absolute right-3 top-3">
-                              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                            <div className="absolute right-3 top-2">
+                              <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
                             </div>
                           )}
 
@@ -931,9 +933,9 @@ export function SeatsStep({
 
                       {/* Show customer info if selected */}
                       {passenger.customerId ? (
-                        <div className="bg-primary/5 p-4 rounded-lg space-y-3 border border-primary/20">
+                        <div className="bg-primary/5 p-3 rounded-lg space-y-2 border border-primary/20">
                           <div className="flex justify-between items-center">
-                            <h4 className="font-medium text-primary">
+                            <h4 className="font-medium text-primary text-sm">
                               Información del Cliente
                             </h4>
                             <Button
@@ -941,39 +943,42 @@ export function SeatsStep({
                               variant="ghost"
                               size="sm"
                               onClick={() => clearSelectedCustomer(index)}
+                              className="h-7 px-2"
                             >
-                              <X className="h-4 w-4 mr-1" /> Limpiar
+                              <X className="h-3 w-3 mr-1" /> Limpiar
                             </Button>
                           </div>
-                          <div className="grid grid-cols-1 gap-3">
+                          <div className="grid grid-cols-1 gap-2">
                             <div>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 Nombre Completo
                               </p>
-                              <p className="font-medium">
+                              <p className="font-medium text-sm truncate">
                                 {passenger.fullName}
                               </p>
                             </div>
                             <div>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 Documento de Identidad
                               </p>
-                              <p>{passenger.documentId}</p>
+                              <p className="text-sm">{passenger.documentId}</p>
                             </div>
                             {passenger.phone && (
                               <div>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-xs text-muted-foreground">
                                   Teléfono
                                 </p>
-                                <p>{passenger.phone}</p>
+                                <p className="text-sm">{passenger.phone}</p>
                               </div>
                             )}
                             {passenger.email && (
                               <div>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-xs text-muted-foreground">
                                   Correo Electrónico
                                 </p>
-                                <p>{passenger.email}</p>
+                                <p className="text-sm truncate">
+                                  {passenger.email}
+                                </p>
                               </div>
                             )}
                           </div>
@@ -981,10 +986,10 @@ export function SeatsStep({
                       ) : (
                         <>
                           {/* Full Name */}
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             <Label
                               htmlFor={`passenger-${index}-name`}
-                              className="text-base font-medium"
+                              className="text-sm font-medium"
                             >
                               Nombre Completo
                             </Label>
@@ -1002,15 +1007,15 @@ export function SeatsStep({
                                 });
                               }}
                               placeholder="Ingrese nombre completo del pasajero"
-                              className="h-12 text-base px-4"
+                              className="h-10 text-sm w-full"
                             />
                           </div>
 
                           {/* Phone */}
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             <Label
                               htmlFor={`passenger-${index}-phone`}
-                              className="text-base font-medium"
+                              className="text-sm font-medium"
                             >
                               Teléfono (opcional)
                             </Label>
@@ -1027,15 +1032,15 @@ export function SeatsStep({
                                 });
                               }}
                               placeholder="Número de teléfono"
-                              className="h-12 text-base px-4"
+                              className="h-10 text-sm w-full"
                             />
                           </div>
 
                           {/* Email */}
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             <Label
                               htmlFor={`passenger-${index}-email`}
-                              className="text-base font-medium"
+                              className="text-sm font-medium"
                             >
                               Correo Electrónico (opcional)
                             </Label>
@@ -1052,7 +1057,7 @@ export function SeatsStep({
                                 });
                               }}
                               placeholder="Dirección de correo"
-                              className="h-12 text-base px-4"
+                              className="h-10 text-sm w-full"
                             />
                           </div>
                         </>

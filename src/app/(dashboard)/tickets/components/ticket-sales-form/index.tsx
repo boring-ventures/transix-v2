@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Clock, Users, CheckCircle, Ticket } from "lucide-react";
+import { MapPin, Clock, Users, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,6 +28,7 @@ export default function TicketSalesForm() {
     passengers: [],
   });
   const [createdTickets, setCreatedTickets] = useState<TicketType[]>([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   // Fetch data using hooks
   const { isLoadingLocations } = useLocations();
@@ -46,7 +47,7 @@ export default function TicketSalesForm() {
   );
 
   // Use bulk tickets hook for submission
-  const { createBulkTickets, isLoading: isCreatingTickets } = useBulkTickets();
+  const { createBulkTickets } = useBulkTickets();
 
   // Handle form data changes
   const updateFormData = (data: Partial<FormData>) => {
@@ -179,8 +180,8 @@ export default function TicketSalesForm() {
           // Store created tickets in state for the confirmation step
           setCreatedTickets(createdTickets || []);
 
-          // Move to confirmation step
-          setCurrentStep("confirmation");
+          // Show confirmation screen
+          setShowConfirmation(true);
 
           toast({
             title: "Compra completada",
@@ -194,18 +195,6 @@ export default function TicketSalesForm() {
             variant: "destructive",
           });
         }
-        break;
-      case "confirmation":
-        // Reset form and go back to route step
-        setFormData({
-          originId: "",
-          destinationId: "",
-          scheduleId: "",
-          selectedSeats: [],
-          passengers: [],
-        });
-        setCreatedTickets([]);
-        setCurrentStep("route");
         break;
     }
   };
@@ -222,11 +211,21 @@ export default function TicketSalesForm() {
       case "review":
         setCurrentStep("seats");
         break;
-      case "confirmation":
-        // Don't allow going back from confirmation
-        // as tickets have already been created
-        break;
     }
+  };
+
+  // Start a new sale (reset form)
+  const startNewSale = () => {
+    setFormData({
+      originId: "",
+      destinationId: "",
+      scheduleId: "",
+      selectedSeats: [],
+      passengers: [],
+    });
+    setCreatedTickets([]);
+    setShowConfirmation(false);
+    setCurrentStep("route");
   };
 
   const isStepValid = () => {
@@ -316,6 +315,20 @@ export default function TicketSalesForm() {
     );
   }
 
+  // If we're showing the confirmation screen, render the ConfirmationStep component
+  if (showConfirmation) {
+    return (
+      <div className="w-full max-w-4xl mx-auto">
+        <ConfirmationStep
+          {...stepProps}
+          tickets={createdTickets}
+          goToNextStep={startNewSale}
+        />
+      </div>
+    );
+  }
+
+  // Otherwise, render the normal ticket sales form
   return (
     <div
       className={cn(
@@ -347,8 +360,8 @@ export default function TicketSalesForm() {
           active={currentStep === "schedule"}
           completed={
             !!(
-              currentStep !== "route" &&
               currentStep !== "schedule" &&
+              currentStep !== "route" &&
               formData.scheduleId
             )
           }
@@ -380,66 +393,29 @@ export default function TicketSalesForm() {
           completed={false}
           onClick={() => navigateToStep("review")}
         />
-        <div className="h-px w-full max-w-12 bg-gray-200" />
-        <StepIndicator
-          label="Confirmación"
-          description="Venta completada"
-          icon={<Ticket className="h-5 w-5" />}
-          active={currentStep === "confirmation"}
-          completed={false}
-          onClick={() => {}}
-        />
       </div>
 
-      <Card className="w-full">
-        <CardContent className="pt-6">
-          {/* Render the appropriate step component based on currentStep */}
+      <Card>
+        <CardContent className="p-6">
           {currentStep === "route" && <RouteStep {...stepProps} />}
           {currentStep === "schedule" && <ScheduleStep {...stepProps} />}
           {currentStep === "seats" && <SeatsStep {...stepProps} />}
           {currentStep === "review" && <ReviewStep {...stepProps} />}
-          {currentStep === "confirmation" && (
-            <ConfirmationStep {...stepProps} tickets={createdTickets} />
-          )}
         </CardContent>
       </Card>
 
-      {/* Navigation buttons */}
-      {currentStep !== "confirmation" && (
-        <div className="flex justify-between mt-6">
-          <Button
-            variant="outline"
-            onClick={goToPreviousStep}
-            disabled={currentStep === "route"}
-          >
-            Atrás
-          </Button>
-
-          {/* Step counter */}
-          <div className="text-center text-sm text-muted-foreground">
-            Paso{" "}
-            {currentStep === "route"
-              ? "1"
-              : currentStep === "schedule"
-                ? "2"
-                : currentStep === "seats"
-                  ? "3"
-                  : "4"}{" "}
-            de 4
-          </div>
-
-          <Button
-            onClick={goToNextStep}
-            disabled={!isStepValid() || isCreatingTickets}
-            className={isCreatingTickets ? "opacity-80" : ""}
-          >
-            {isCreatingTickets && (
-              <div className="mr-2 animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-            )}
-            {currentStep === "review" ? "Confirmar compra" : "Siguiente"}
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-between mt-6">
+        <Button
+          variant="outline"
+          onClick={goToPreviousStep}
+          disabled={currentStep === "route"}
+        >
+          Atrás
+        </Button>
+        <Button onClick={goToNextStep} disabled={!isStepValid()}>
+          {currentStep === "review" ? "Confirmar Compra" : "Siguiente"}
+        </Button>
+      </div>
     </div>
   );
 }
