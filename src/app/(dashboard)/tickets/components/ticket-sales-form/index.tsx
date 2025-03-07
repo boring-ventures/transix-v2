@@ -5,16 +5,14 @@ import { MapPin, Clock, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import type { FormData, Step } from "./types";
+import type { FormData, Schedule, Step } from "./types";
 import { StepIndicator } from "./step-indicator";
 import { RouteStep } from "./route-step";
 import { ScheduleStep } from "./schedule-step";
 import { SeatsStep } from "./seats-step";
 import { ReviewStep } from "./review-step";
 import { useLocations } from "@/hooks/use-locations";
-import { useRoutes } from "@/hooks/use-routes";
 import { useSchedules } from "@/hooks/use-schedules";
-import { useBusSeats } from "@/hooks/use-bus-seats";
 import { useBulkTickets } from "@/hooks/use-bulk-tickets";
 
 export default function TicketSalesForm() {
@@ -29,8 +27,7 @@ export default function TicketSalesForm() {
   });
 
   // Fetch data using hooks
-  const { locations, isLoadingLocations } = useLocations();
-  const { routes, isLoading: isLoadingRoutes } = useRoutes();
+  const { isLoadingLocations } = useLocations();
 
   // We'll get the schedules from the ScheduleStep component
   // so we don't need to fetch them here
@@ -42,7 +39,7 @@ export default function TicketSalesForm() {
 
   // Get selected schedule
   const selectedSchedule = schedules.find(
-    (schedule) => schedule.id === formData.scheduleId
+    (schedule: Schedule) => schedule.id === formData.scheduleId
   );
 
   // Use bulk tickets hook for submission
@@ -117,9 +114,14 @@ export default function TicketSalesForm() {
             return;
           }
 
-          const tickets = formData.passengers.map((passenger) => ({
+          // Filter out passengers with undefined busSeatId
+          const validPassengers = formData.passengers.filter(
+            (passenger) => passenger.busSeatId !== undefined
+          );
+
+          const tickets = validPassengers.map((passenger) => ({
             scheduleId: formData.scheduleId,
-            busSeatId: passenger.busSeatId, // This should be the UUID, not the seat number
+            busSeatId: passenger.busSeatId as string, // Type assertion to ensure it's a string
             customerId: undefined, // Could be added if we have customer management
             price: selectedSchedule.price,
             notes: `Pasajero: ${passenger.fullName}, Documento: ${passenger.documentId}`,
@@ -144,7 +146,8 @@ export default function TicketSalesForm() {
             passengers: [],
           });
           setCurrentStep("route");
-        } catch (error) {
+        } catch (err) {
+          console.error("Error creating tickets:", err);
           toast({
             title: "Error",
             description: "Ha ocurrido un error al procesar la compra",

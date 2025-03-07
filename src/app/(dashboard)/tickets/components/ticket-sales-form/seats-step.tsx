@@ -12,10 +12,50 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
-import { useSchedules } from "@/hooks/use-schedules";
 import type { Schedule, ScheduleAvailability } from "@/hooks/use-schedules";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
+
+// Extended seat type that includes all properties used in the component
+interface ExtendedSeat {
+  id: string;
+  seatNumber: string;
+  name?: string;
+  isEmpty?: boolean;
+  isAvailable?: boolean;
+  isBooked?: boolean;
+  tierId?: string;
+  status?: string;
+  isActive?: boolean;
+  tier?: {
+    id: string;
+    name: string;
+    basePrice: number;
+  };
+  row?: number;
+  column?: number;
+}
+
+// Extended availability type that includes seatMatrix
+interface ExtendedScheduleAvailability extends ScheduleAvailability {
+  seatMatrix?: {
+    firstFloor: {
+      dimensions: { rows: number; seatsPerRow: number };
+      seats: Array<ExtendedSeat>;
+    };
+    secondFloor?: {
+      dimensions: { rows: number; seatsPerRow: number };
+      seats: Array<ExtendedSeat>;
+    };
+  };
+}
+
+// Define a location type with id property
+interface LocationWithId {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
 
 export function SeatsStep({
   formData,
@@ -32,7 +72,7 @@ export function SeatsStep({
   );
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [availabilityData, setAvailabilityData] =
-    useState<ScheduleAvailability | null>(null);
+    useState<ExtendedScheduleAvailability | null>(null);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugData, setDebugData] = useState<{
@@ -52,16 +92,17 @@ export function SeatsStep({
     }>;
     bookedSeatIds: string[];
     busId: string;
-    originalSeatMatrix?: any;
+    originalSeatMatrix?: Record<string, unknown>;
   } | null>(null);
   const [showAllSeats, setShowAllSeats] = useState(false);
+  // Used for the Tabs component to track which floor is currently active
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeFloor, setActiveFloor] = useState<"firstFloor" | "secondFloor">(
     "firstFloor"
   );
 
   // Fetch data from API
   const { locations } = useLocations();
-  const { fetchScheduleAvailability } = useSchedules();
 
   // Fetch the selected schedule and its availability
   useEffect(() => {
@@ -127,8 +168,8 @@ export function SeatsStep({
   const displaySeats = showAllSeats ? allSeats : availableSeats;
 
   // Combine with selected seats
-  const seats = displaySeats.map(
-    (seat: {
+  const seats = (
+    displaySeats as Array<{
       id: string;
       seatNumber: string;
       tierId: string;
@@ -136,17 +177,18 @@ export function SeatsStep({
       isActive: boolean;
       isBooked?: boolean;
       isAvailable?: boolean;
+      name?: string;
       tier?: {
         id: string;
         name: string;
         basePrice: number;
       };
-    }) => ({
-      ...seat,
-      isSelected: formData.selectedSeats.includes(seat.id),
-      isAvailable: seat.isAvailable !== undefined ? seat.isAvailable : true,
-    })
-  );
+    }>
+  ).map((seat) => ({
+    ...seat,
+    isSelected: formData.selectedSeats.includes(seat.id),
+    isAvailable: seat.isAvailable !== undefined ? seat.isAvailable : true,
+  }));
 
   useEffect(() => {
     if (formData.passengers.length > 0 && !expandedPassenger) {
@@ -155,9 +197,11 @@ export function SeatsStep({
   }, [formData.passengers, expandedPassenger]);
 
   // Get location names
-  const originName = locations.find((l) => l.id === formData.originId)?.name;
+  const originName = locations.find(
+    (l: LocationWithId) => l.id === formData.originId
+  )?.name;
   const destinationName = locations.find(
-    (l) => l.id === formData.destinationId
+    (l: LocationWithId) => l.id === formData.destinationId
   )?.name;
 
   // Show loading state
@@ -252,7 +296,7 @@ export function SeatsStep({
   }
 
   // Render a seat
-  const renderSeat = (seat) => {
+  const renderSeat = (seat: ExtendedSeat) => {
     if (!seat) return null;
 
     // Find the seat in our processed seats array to get availability info
@@ -309,7 +353,7 @@ export function SeatsStep({
 
                 // Find the actual seat in allSeats by seat number
                 const actualSeat = allSeats.find(
-                  (s) => s.seatNumber === seat.id || s.name === seat.id
+                  (s) => s.seatNumber === seat.id
                 );
 
                 if (actualSeat) {
@@ -323,7 +367,7 @@ export function SeatsStep({
 
                   // As a fallback, try to find the seat in the processed seats array
                   const processedSeat = seats.find(
-                    (s) => s.seatNumber === seat.id || s.name === seat.id
+                    (s) => s.seatNumber === seat.id
                   );
 
                   if (processedSeat) {
@@ -332,7 +376,7 @@ export function SeatsStep({
                   }
                 }
               }
-              
+
               const newPassenger = {
                 fullName: "",
                 documentId: "",
@@ -403,8 +447,10 @@ export function SeatsStep({
     // Place seats in the grid
     floor.seats.forEach((seat) => {
       if (
+        seat.row !== undefined &&
         seat.row >= 0 &&
         seat.row < rows &&
+        seat.column !== undefined &&
         seat.column >= 0 &&
         seat.column < seatsPerRow
       ) {

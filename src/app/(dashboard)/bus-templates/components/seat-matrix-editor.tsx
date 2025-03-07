@@ -19,9 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   SeatPosition,
   SeatMatrixDimensions,
-  SeatMatrixFloor,
   SeatTemplateMatrix,
-  SeatLayoutType,
 } from "@/hooks/use-bus-templates";
 
 interface SeatMatrixEditorProps {
@@ -38,22 +36,26 @@ export function SeatMatrixEditor({
 }: SeatMatrixEditorProps) {
   const [hasSecondFloor, setHasSecondFloor] = useState(!!value.secondFloor);
   const [selectedSeat, setSelectedSeat] = useState<SeatPosition | null>(null);
-  const [selectedFloor, setSelectedFloor] = useState<"firstFloor" | "secondFloor">("firstFloor");
+  const [selectedFloor, setSelectedFloor] = useState<
+    "firstFloor" | "secondFloor"
+  >("firstFloor");
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
-  
+
   // Dimensions state
-  const [firstFloorDimensions, setFirstFloorDimensions] = useState({
-    rows: value.firstFloor.dimensions.rows,
-    seatsPerRow: value.firstFloor.dimensions.seatsPerRow,
-  });
-  
-  const [secondFloorDimensions, setSecondFloorDimensions] = useState(
-    value.secondFloor
+  const [dimensions, setDimensions] = useState({
+    firstFloor: {
+      rows: value.firstFloor.dimensions.rows,
+      seatsPerRow: value.firstFloor.dimensions.seatsPerRow,
+    },
+    secondFloor: value.secondFloor
       ? value.secondFloor.dimensions
-      : { rows: value.firstFloor.dimensions.rows, seatsPerRow: value.firstFloor.dimensions.seatsPerRow }
-  );
-  
+      : {
+          rows: value.firstFloor.dimensions.rows,
+          seatsPerRow: value.firstFloor.dimensions.seatsPerRow,
+        },
+  });
+
   // Generate seats based on dimensions
   const generateSeats = (
     dimensions: SeatMatrixDimensions,
@@ -98,51 +100,59 @@ export function SeatMatrixEditor({
     floor: "firstFloor" | "secondFloor",
     newDimensions: SeatMatrixDimensions
   ) => {
-    const isSecondFloor = floor === "secondFloor";
-    const currentMatrix = { ...value };
-    const currentFloor = currentMatrix[floor] || {
-      dimensions: newDimensions,
-      seats: [],
-    };
+    // Create a copy of the current matrix
+    const updatedMatrix = { ...value };
 
-    // Generate new seats based on the new dimensions
-    const newSeats = generateSeats(
-      newDimensions,
-      currentFloor.seats,
-      isSecondFloor
-    );
-
-    // Update the matrix with the new floor configuration
-    const updatedMatrix = {
-      ...currentMatrix,
-      [floor]: {
+    // Update the dimensions in the matrix
+    if (floor === "firstFloor") {
+      updatedMatrix.firstFloor = {
+        ...updatedMatrix.firstFloor,
         dimensions: newDimensions,
-        seats: newSeats,
-      },
-    };
+        seats: generateSeats(
+          newDimensions,
+          updatedMatrix.firstFloor.seats,
+          false
+        ),
+      };
+    } else if (updatedMatrix.secondFloor) {
+      updatedMatrix.secondFloor = {
+        ...updatedMatrix.secondFloor,
+        dimensions: newDimensions,
+        seats: generateSeats(
+          newDimensions,
+          updatedMatrix.secondFloor.seats,
+          true
+        ),
+      };
+    }
 
     // Update the dimensions state
     if (floor === "firstFloor") {
-      setFirstFloorDimensions(newDimensions);
+      setDimensions((prev) => ({
+        ...prev,
+        firstFloor: newDimensions,
+      }));
     } else {
-      setSecondFloorDimensions(newDimensions);
+      setDimensions((prev) => ({
+        ...prev,
+        secondFloor: newDimensions,
+      }));
     }
 
-    // Notify parent component of the change
+    // Call the onChange callback with the updated matrix
     onChange(updatedMatrix);
   };
 
   // Toggle second floor
   const handleToggleSecondFloor = (checked: boolean) => {
     setHasSecondFloor(checked);
-
     const updatedMatrix = { ...value };
 
-    if (checked && !updatedMatrix.secondFloor) {
+    if (checked) {
       // Add second floor if it doesn't exist
       updatedMatrix.secondFloor = {
-        dimensions: secondFloorDimensions,
-        seats: generateSeats(secondFloorDimensions, [], true),
+        dimensions: dimensions.secondFloor,
+        seats: generateSeats(dimensions.secondFloor, [], true),
       };
     } else if (!checked && updatedMatrix.secondFloor) {
       // Remove second floor if it exists
@@ -502,10 +512,13 @@ export function SeatMatrixEditor({
 
       {selectedSeat && (
         <EditSeatDialog
+          open={!!selectedSeat}
+          onOpenChange={(open) => {
+            if (!open) setSelectedSeat(null);
+          }}
           seat={selectedSeat}
           seatTiers={seatTiers}
           onUpdate={handleUpdateSeat}
-          onClose={() => setSelectedSeat(null)}
         />
       )}
     </div>

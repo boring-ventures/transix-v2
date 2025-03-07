@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma, MaintenanceStatus, SeatStatus } from "@prisma/client";
+import type { Prisma} from "@prisma/client";
 
 // Get all buses with optional filtering
 export async function GET(req: Request) {

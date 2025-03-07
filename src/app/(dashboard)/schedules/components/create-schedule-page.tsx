@@ -8,7 +8,7 @@ import * as z from "zod";
 import { useSchedules, type ScheduleFormData } from "@/hooks/use-schedules";
 import { type Bus, useBuses } from "@/hooks/use-buses";
 import { type Driver, useDrivers } from "@/hooks/use-drivers";
-import { useRoutes } from "@/hooks/use-routes";
+import { Route, useRoutes } from "@/hooks/use-routes";
 import {
   useRouteSchedules,
   type RouteSchedule,
@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, addMinutes, isSameDay } from "date-fns";
+import { format, addMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon, Loader2, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -89,6 +89,7 @@ export function CreateSchedulePage() {
     if (routeId) {
       setSelectedRouteId(routeId);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.watch("routeId")]);
 
   // Update estimated arrival time when route schedule changes
@@ -126,7 +127,7 @@ export function CreateSchedulePage() {
       }
     } else if (routeId && departureDate) {
       // If no route schedule is selected, try to get the route directly
-      const route = routes.find((r) => r.id === routeId);
+      const route = routes.find((r: Route) => r.id === routeId);
       if (route) {
         // Calculate estimated arrival time based on departure time and route duration
         const estimatedArrivalTime = addMinutes(
@@ -210,7 +211,7 @@ export function CreateSchedulePage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {routes.map((route) => (
+                          {routes.map((route: Route) => (
                             <SelectItem key={route.id} value={route.id}>
                               {route.name}
                             </SelectItem>

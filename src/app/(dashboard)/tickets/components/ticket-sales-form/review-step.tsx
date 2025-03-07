@@ -1,10 +1,18 @@
 import { useState, useEffect } from "react";
 import { Separator } from "@/components/ui/separator";
-import type { StepComponentProps } from "./types";
+import type { Seat, StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
-import { useSchedules } from "@/hooks/use-schedules";
 import type { Schedule, ScheduleAvailability } from "@/hooks/use-schedules";
 import axios from "axios";
+
+// Extend the ScheduleAvailability type to include debug property
+interface ScheduleAvailabilityWithDebug extends ScheduleAvailability {
+  debug?: {
+    allSeats: Seat[];
+    bookedSeatIds: string[];
+    busId: string;
+  };
+}
 
 export function ReviewStep({
   formData,
@@ -16,13 +24,12 @@ export function ReviewStep({
     null
   );
   const [availabilityData, setAvailabilityData] =
-    useState<ScheduleAvailability | null>(null);
+    useState<ScheduleAvailabilityWithDebug | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch data from API
   const { locations } = useLocations();
-  const { fetchScheduleAvailability } = useSchedules();
 
   // Fetch the selected schedule and its availability
   useEffect(() => {
@@ -64,14 +71,17 @@ export function ReviewStep({
   const allSeats = availabilityData?.debug?.allSeats || [];
 
   // Find selected seats from all seats
-  const selectedSeats = allSeats.filter((seat) =>
+  const selectedSeats = allSeats.filter((seat: Seat) =>
     formData.selectedSeats.includes(seat.id)
   );
 
   // Get location names
-  const originName = locations.find((l) => l.id === formData.originId)?.name;
+  type LocationWithId = { id: string; name: string; [key: string]: unknown };
+  const originName = locations.find(
+    (l: LocationWithId) => l.id === formData.originId
+  )?.name;
   const destinationName = locations.find(
-    (l) => l.id === formData.destinationId
+    (l: LocationWithId) => l.id === formData.destinationId
   )?.name;
 
   // Show loading state
@@ -159,7 +169,7 @@ export function ReviewStep({
               <p>
                 $
                 {formData.selectedSeats.reduce((total, seatId) => {
-                  const seat = selectedSeats.find((s) => s.id === seatId);
+                  const seat = selectedSeats.find((s: Seat) => s.id === seatId);
                   return total + (seat?.tier?.basePrice || 0);
                 }, 0)}
               </p>
