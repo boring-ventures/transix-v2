@@ -1,6 +1,36 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// Define interfaces for the seat matrix structure
+interface SeatPosition {
+  id: string;
+  seatNumber?: string;
+  name?: string;
+  row?: number;
+  column?: number;
+  isEmpty?: boolean;
+  status?: string;
+  isActive?: boolean;
+  isBooked?: boolean;
+  isAvailable?: boolean;
+  tierId?: string;
+  tier?: {
+    id: string;
+    name: string;
+    basePrice: number;
+  } | null;
+}
+
+interface SeatMatrixFloor {
+  dimensions: { rows: number; seatsPerRow: number };
+  seats: SeatPosition[];
+}
+
+interface SeatMatrix {
+  firstFloor: SeatMatrixFloor;
+  secondFloor?: SeatMatrixFloor;
+}
+
 // Get available seats for a schedule
 export async function GET(req: Request) {
   try {
@@ -106,9 +136,16 @@ export async function GET(req: Request) {
       isActive: scheduleSeat.isActive,
       seatNumber: scheduleSeat.busSeat.seatNumber,
       tierId: scheduleSeat.busSeat.tierId,
-      floor: scheduleSeat.busSeat.floor || "first", // Default to first floor if not specified
-      row: scheduleSeat.busSeat.row,
-      column: scheduleSeat.busSeat.column,
+      floor:
+        (scheduleSeat.busSeat as Record<string, unknown>)[
+          "floor"
+        ]?.toString() || "first", // Default to first floor if not specified
+      row: (scheduleSeat.busSeat as Record<string, unknown>)["row"] as
+        | number
+        | undefined,
+      column: (scheduleSeat.busSeat as Record<string, unknown>)["column"] as
+        | number
+        | undefined,
       isBooked: bookedSeatIds.includes(scheduleSeat.busSeatId),
       isAvailable:
         scheduleSeat.isActive &&
@@ -202,11 +239,11 @@ export async function GET(req: Request) {
 // Helper function to create a seat matrix that preserves the original arrangement
 // but updates seat status based on processed seats and booked seats
 function createSeatMatrixWithStatus(
-  originalMatrix,
-  processedSeats,
-  bookedSeatIds
+  originalMatrix: SeatMatrix,
+  processedSeats: SeatPosition[],
+  bookedSeatIds: string[]
 ) {
-  const result = {
+  const result: SeatMatrix = {
     firstFloor: {
       dimensions: originalMatrix.firstFloor.dimensions,
       seats: [],
@@ -216,10 +253,10 @@ function createSeatMatrixWithStatus(
   // Process first floor seats
   if (originalMatrix.firstFloor && originalMatrix.firstFloor.seats) {
     result.firstFloor.seats = originalMatrix.firstFloor.seats.map(
-      (originalSeat) => {
+      (originalSeat: SeatPosition) => {
         // Find the corresponding processed seat
         const processedSeat = processedSeats.find(
-          (s) => s.seatNumber === originalSeat.id
+          (s: SeatPosition) => s.seatNumber === originalSeat.id
         );
 
         if (!processedSeat) {
@@ -284,13 +321,15 @@ function createSeatMatrixWithStatus(
 }
 
 // Helper function to organize seats into a matrix format
-function organizeSeatsIntoMatrix(seats) {
+function organizeSeatsIntoMatrix(seats: SeatPosition[]) {
   if (!seats || seats.length === 0)
     return { dimensions: { rows: 0, seatsPerRow: 0 }, seats: [] };
 
   // Find the maximum row and column to determine dimensions
-  const maxRow = Math.max(...seats.map((seat) => seat.row)) + 1;
-  const maxColumn = Math.max(...seats.map((seat) => seat.column)) + 1;
+  const maxRow =
+    Math.max(...seats.map((seat: SeatPosition) => seat.row || 0)) + 1;
+  const maxColumn =
+    Math.max(...seats.map((seat: SeatPosition) => seat.column || 0)) + 1;
 
   return {
     dimensions: {

@@ -52,9 +52,17 @@ export function ScheduleStep({
   }, [formData.originId, formData.destinationId, searchSchedulesByRoute]);
 
   // Get location names
-  const originName = locations.find((l) => l.id === formData.originId)?.name;
+  interface LocationWithId {
+    id: string;
+    name: string;
+    [key: string]: unknown;
+  }
+
+  const originName = locations.find(
+    (l: LocationWithId) => l.id === formData.originId
+  )?.name;
   const destinationName = locations.find(
-    (l) => l.id === formData.destinationId
+    (l: LocationWithId) => l.id === formData.destinationId
   )?.name;
 
   // Show loading state

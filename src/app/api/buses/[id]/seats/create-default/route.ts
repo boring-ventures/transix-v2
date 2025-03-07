@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { SeatStatus } from "@prisma/client";
 
 // Create default seats for a bus
 export async function POST(
@@ -58,7 +59,7 @@ export async function POST(
           busId: id,
           seatNumber,
           tierId: defaultTier.id,
-          status: "available",
+          status: SeatStatus.available,
           isActive: true,
         });
       }
