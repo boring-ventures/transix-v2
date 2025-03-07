@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
+import { Prisma } from "@prisma/client";
 // Get all customers with optional filtering
 export async function GET(req: Request) {
   try {
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     const fullName = searchParams.get("fullName");
 
     // Build the query
-    const query: any = {};
+    const query: Prisma.CustomerWhereInput = {};
 
     // Use contains for documentId to support partial matches
     if (documentId) {

@@ -19,7 +19,6 @@ interface ConfirmationStepProps extends StepComponentProps {
 
 export function ConfirmationStep({
   formData,
-  tickets,
   formatDate,
   formatTime,
   calculateTotalPrice,

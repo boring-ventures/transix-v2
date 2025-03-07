@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Users, User, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -111,8 +111,12 @@ export function SeatsStep({
 
   // Clean up timeouts on unmount
   useEffect(() => {
+    // Copy the current ref value to a variable inside the effect
+    const timeouts = { ...searchTimeoutRef.current };
+
     return () => {
-      Object.values(searchTimeoutRef.current).forEach((timeout) => {
+      // Use the copied variable in the cleanup function
+      Object.values(timeouts).forEach((timeout) => {
         clearTimeout(timeout);
       });
     };
@@ -292,7 +296,7 @@ export function SeatsStep({
   };
 
   // Add a function to create customers for all passengers without a customerId
-  const createMissingCustomers = async () => {
+  const createMissingCustomers = useCallback(async () => {
     const passengersWithoutCustomerId = formData.passengers.filter(
       (passenger) =>
         !passenger.customerId && passenger.fullName && passenger.documentId
@@ -384,7 +388,13 @@ export function SeatsStep({
       });
       return formData.passengers;
     }
-  };
+  }, [
+    formData.passengers,
+    fetchCustomers,
+    createCustomer,
+    updateFormData,
+    toast,
+  ]);
 
   // Make the function available to the parent component
   useEffect(() => {
@@ -397,7 +407,7 @@ export function SeatsStep({
       // @ts-expect-error - Removing custom property from window object
       delete window.createMissingCustomers;
     };
-  }, []);
+  }, [createMissingCustomers]); // Add createMissingCustomers as a dependency
 
   // Show loading state
   if (isLoadingSchedule || isLoadingAvailability) {
