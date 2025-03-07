@@ -296,53 +296,83 @@ export function SeatsStep({
         !passenger.customerId && passenger.fullName && passenger.documentId
     );
 
-    if (passengersWithoutCustomerId.length === 0) return;
+    if (passengersWithoutCustomerId.length === 0) {
+      console.log("No passengers need customer registration");
+      return formData.passengers;
+    }
+
+    console.log(
+      "Creating customers for passengers:",
+      passengersWithoutCustomerId
+    );
 
     try {
-      const createdCustomers = await Promise.all(
-        passengersWithoutCustomerId.map(async (passenger, idx) => {
-          try {
-            const customer = await createCustomer({
+      const updatedPassengers = [...formData.passengers];
+
+      // Process each passenger sequentially to avoid race conditions
+      for (let i = 0; i < passengersWithoutCustomerId.length; i++) {
+        const passenger = passengersWithoutCustomerId[i];
+        const passengerIndex = formData.passengers.findIndex(
+          (p) => p.seatNumber === passenger.seatNumber
+        );
+
+        if (passengerIndex === -1) continue;
+
+        try {
+          console.log(
+            `Creating customer for passenger ${i + 1}/${passengersWithoutCustomerId.length}:`,
+            passenger
+          );
+
+          // First check if customer already exists with this document ID
+          const existingCustomers = await fetchCustomers({
+            documentId: passenger.documentId,
+          });
+          let customer;
+
+          if (existingCustomers && existingCustomers.length > 0) {
+            // Use existing customer
+            customer = existingCustomers[0];
+            console.log("Found existing customer:", customer);
+          } else {
+            // Create new customer
+            customer = await createCustomer({
               fullName: passenger.fullName,
               documentId: passenger.documentId,
               phone: passenger.phone,
               email: passenger.email,
             });
-            return {
-              passenger,
-              customer,
-              index: formData.passengers.findIndex(
-                (p) => p.seatNumber === passenger.seatNumber
-              ),
-            };
-          } catch (err) {
-            console.error(`Error creating customer for passenger ${idx}:`, err);
-            return null;
+            console.log("Created new customer:", customer);
           }
-        })
-      );
 
-      // Update passengers with created customers
-      const updatedPassengers = [...formData.passengers];
-      createdCustomers.forEach((result) => {
-        if (result && result.customer) {
-          updatedPassengers[result.index] = {
-            ...updatedPassengers[result.index],
-            customerId: result.customer.id,
-            customer: result.customer,
-          };
+          if (customer) {
+            updatedPassengers[passengerIndex] = {
+              ...updatedPassengers[passengerIndex],
+              customerId: customer.id,
+              customer: customer,
+            };
+          }
+        } catch (err) {
+          console.error(`Error processing passenger ${i + 1}:`, err);
         }
-      });
+      }
 
+      // Update form data with the new passenger information
       updateFormData({ passengers: updatedPassengers });
 
-      const createdCount = createdCustomers.filter(Boolean).length;
+      const createdCount =
+        updatedPassengers.filter((p) => p.customerId).length -
+        formData.passengers.filter((p) => p.customerId).length;
+
       if (createdCount > 0) {
         toast({
           title: "Clientes registrados",
           description: `Se han registrado ${createdCount} nuevos clientes`,
         });
       }
+
+      console.log("Final updated passengers:", updatedPassengers);
+      return updatedPassengers;
     } catch (err) {
       console.error("Error creating customers:", err);
       toast({
@@ -350,29 +380,20 @@ export function SeatsStep({
         description: "Error al registrar clientes",
         variant: "destructive",
       });
+      return formData.passengers;
     }
   };
 
   // Make the function available to the parent component
   useEffect(() => {
-    // Use a custom event to communicate with the parent component
-    const customEvent = new CustomEvent("registerMissingCustomers", {
-      detail: { createMissingCustomers },
-    });
-    document.dispatchEvent(customEvent);
-
-    // Add listener for when the parent wants to create customers
-    const handleCreateCustomers = () => {
-      createMissingCustomers();
-    };
-
-    document.addEventListener("createMissingCustomers", handleCreateCustomers);
+    // Add the function to the window object so it can be called from the parent
+    // @ts-expect-error - Adding custom property to window object
+    window.createMissingCustomers = createMissingCustomers;
 
     return () => {
-      document.removeEventListener(
-        "createMissingCustomers",
-        handleCreateCustomers
-      );
+      // Clean up when component unmounts
+      // @ts-expect-error - Removing custom property from window object
+      delete window.createMissingCustomers;
     };
   }, []);
 
@@ -952,56 +973,54 @@ export function SeatsStep({
                             />
                           </div>
 
-                          {/* Phone and Email */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <Label
-                                htmlFor={`passenger-${index}-phone`}
-                                className="text-base font-medium"
-                              >
-                                Teléfono (opcional)
-                              </Label>
-                              <Input
-                                id={`passenger-${index}-phone`}
-                                value={passenger.phone || ""}
-                                onChange={(e) => {
-                                  const updatedPassengers = [
-                                    ...formData.passengers,
-                                  ];
-                                  updatedPassengers[index].phone =
-                                    e.target.value;
-                                  updateFormData({
-                                    passengers: updatedPassengers,
-                                  });
-                                }}
-                                placeholder="Número de teléfono"
-                                className="h-12 text-base px-4"
-                              />
-                            </div>
-                            <div className="space-y-3">
-                              <Label
-                                htmlFor={`passenger-${index}-email`}
-                                className="text-base font-medium"
-                              >
-                                Correo Electrónico (opcional)
-                              </Label>
-                              <Input
-                                id={`passenger-${index}-email`}
-                                value={passenger.email || ""}
-                                onChange={(e) => {
-                                  const updatedPassengers = [
-                                    ...formData.passengers,
-                                  ];
-                                  updatedPassengers[index].email =
-                                    e.target.value;
-                                  updateFormData({
-                                    passengers: updatedPassengers,
-                                  });
-                                }}
-                                placeholder="Dirección de correo"
-                                className="h-12 text-base px-4"
-                              />
-                            </div>
+                          {/* Phone */}
+                          <div className="space-y-3">
+                            <Label
+                              htmlFor={`passenger-${index}-phone`}
+                              className="text-base font-medium"
+                            >
+                              Teléfono (opcional)
+                            </Label>
+                            <Input
+                              id={`passenger-${index}-phone`}
+                              value={passenger.phone || ""}
+                              onChange={(e) => {
+                                const updatedPassengers = [
+                                  ...formData.passengers,
+                                ];
+                                updatedPassengers[index].phone = e.target.value;
+                                updateFormData({
+                                  passengers: updatedPassengers,
+                                });
+                              }}
+                              placeholder="Número de teléfono"
+                              className="h-12 text-base px-4"
+                            />
+                          </div>
+
+                          {/* Email */}
+                          <div className="space-y-3">
+                            <Label
+                              htmlFor={`passenger-${index}-email`}
+                              className="text-base font-medium"
+                            >
+                              Correo Electrónico (opcional)
+                            </Label>
+                            <Input
+                              id={`passenger-${index}-email`}
+                              value={passenger.email || ""}
+                              onChange={(e) => {
+                                const updatedPassengers = [
+                                  ...formData.passengers,
+                                ];
+                                updatedPassengers[index].email = e.target.value;
+                                updateFormData({
+                                  passengers: updatedPassengers,
+                                });
+                              }}
+                              placeholder="Dirección de correo"
+                              className="h-12 text-base px-4"
+                            />
                           </div>
                         </>
                       )}

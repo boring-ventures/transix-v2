@@ -74,13 +74,78 @@ export default function TicketSalesForm() {
             return;
           }
 
+          // Register any unregistered customers before creating tickets
+          let updatedPassengers = [...formData.passengers];
+          try {
+            console.log("Attempting to register missing customers...");
+            // Access the function from the window object in a way that avoids TypeScript errors
+            const windowWithCustomFn = window as Window & {
+              createMissingCustomers?: () => Promise<
+                typeof formData.passengers
+              >;
+            };
+
+            if (
+              typeof windowWithCustomFn.createMissingCustomers === "function"
+            ) {
+              console.log(
+                "createMissingCustomers function found, calling it..."
+              );
+              const result = await windowWithCustomFn.createMissingCustomers();
+              if (Array.isArray(result)) {
+                console.log(
+                  "Customer registration successful, got updated passengers:",
+                  result
+                );
+                updatedPassengers = result;
+
+                // Update the form data with the latest passenger information
+                setFormData((prev) => ({
+                  ...prev,
+                  passengers: updatedPassengers,
+                }));
+              }
+            } else {
+              console.warn(
+                "createMissingCustomers function not found on window object"
+              );
+            }
+          } catch (error) {
+            console.error("Error registering customers:", error);
+            // Continue with ticket creation even if customer registration fails
+          }
+
           // Debug log to check passenger data
-          console.log("Passenger data:", formData.passengers);
+          console.log(
+            "Final passenger data for ticket creation:",
+            updatedPassengers
+          );
 
           // Filter out passengers with undefined busSeatId
-          const validPassengers = formData.passengers.filter(
+          const validPassengers = updatedPassengers.filter(
             (passenger) => passenger.busSeatId !== undefined
           );
+
+          // Check if any passengers are missing customer IDs
+          const passengersWithoutCustomerId = validPassengers.filter(
+            (passenger) =>
+              !passenger.customerId &&
+              passenger.fullName &&
+              passenger.documentId
+          );
+
+          if (passengersWithoutCustomerId.length > 0) {
+            console.warn(
+              "Some passengers still don't have customer IDs:",
+              passengersWithoutCustomerId
+            );
+            toast({
+              title: "Advertencia",
+              description:
+                "Algunos pasajeros no pudieron ser registrados como clientes",
+              variant: "destructive",
+            });
+          }
 
           const tickets = validPassengers.map((passenger) => ({
             scheduleId: formData.scheduleId,
