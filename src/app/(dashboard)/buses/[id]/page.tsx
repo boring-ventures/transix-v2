@@ -37,7 +37,17 @@ export default function BusDetailPage() {
   useEffect(() => {
     const getBusDetails = async () => {
       try {
+        console.log("Fetching bus details for ID:", id);
         const busData = await fetchBus(id as string);
+        console.log("Received bus data:", busData);
+
+        if (!busData) {
+          console.error("No bus data returned for ID:", id);
+          setError("Bus not found");
+          setIsLoading(false);
+          return;
+        }
+
         setBus(busData);
 
         // Calculate seat capacity from the seat matrix
@@ -45,14 +55,14 @@ export default function BusDetailPage() {
           let totalSeats = 0;
 
           // Count non-empty seats in first floor
-          if (busData.seatMatrix.firstFloor) {
+          if (busData.seatMatrix.firstFloor?.seats) {
             totalSeats += busData.seatMatrix.firstFloor.seats.filter(
               (seat: MatrixSeat) => !seat.isEmpty
             ).length;
           }
 
           // Count non-empty seats in second floor if it exists
-          if (busData.seatMatrix.secondFloor) {
+          if (busData.seatMatrix.secondFloor?.seats) {
             totalSeats += busData.seatMatrix.secondFloor.seats.filter(
               (seat: MatrixSeat) => !seat.isEmpty
             ).length;

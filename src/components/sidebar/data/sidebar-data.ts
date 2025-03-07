@@ -14,7 +14,6 @@ import {
   Route,
   BusFront,
   FileSpreadsheet,
-  Settings,
 } from "lucide-react";
 import type { SidebarData } from "../types";
 
@@ -101,12 +100,7 @@ export const sidebarData: SidebarData = {
               title: "Plantillas",
               url: "/bus-templates",
               icon: FileSpreadsheet,
-            },
-            {
-              title: "Mantenimiento",
-              url: "/buses/maintenance",
-              icon: Settings,
-            },
+            }
           ],
         },
         {

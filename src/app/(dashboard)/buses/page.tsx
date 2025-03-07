@@ -13,6 +13,8 @@ export default function BusesPage() {
   // Add debugging
   useEffect(() => {
     console.log("Buses data:", buses);
+    console.log("Buses count:", buses?.length || 0);
+    
     if (busesError) {
       console.error("Error loading buses:", busesError);
     }

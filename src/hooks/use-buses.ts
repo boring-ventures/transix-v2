@@ -51,21 +51,33 @@ export function useBuses(isActive?: boolean) {
       let url = "/api/buses";
       const params = new URLSearchParams();
 
-      if (isActive !== undefined) params.append("isActive", isActive.toString());
+      // Only add isActive param if it's explicitly defined (not undefined)
+      if (isActive !== undefined) {
+        params.append("isActive", String(isActive));
+      }
 
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
 
+      console.log("Fetching buses with URL:", url);
       const response = await axios.get(url);
+      console.log("Buses response:", response.data);
       return response.data.buses || [];
     },
   });
 
   // Fetch a single bus by ID
   const fetchBus = useCallback(async (id: string) => {
-    const response = await axios.get(`/api/buses/${id}`);
-    return response.data.bus;
+    try {
+      console.log("Fetching bus with ID:", id);
+      const response = await axios.get(`/api/buses/${id}`);
+      console.log("Bus data received:", response.data);
+      return response.data.bus;
+    } catch (error) {
+      console.error("Error fetching bus:", error);
+      throw error;
+    }
   }, []);
 
   // Create a new bus

@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 // Get a specific bus by ID
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const { id } = params;
 
     const bus = await prisma.bus.findUnique({
       where: { id },
@@ -32,10 +32,7 @@ export async function GET(
     });
 
     if (!bus) {
-      return NextResponse.json(
-        { error: "Bus not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Bus not found" }, { status: 404 });
     }
 
     // Parse JSON strings back to objects
@@ -57,12 +54,13 @@ export async function GET(
 // Update a bus
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const { id } = params;
     const json = await request.json();
-    const { plateNumber, isActive, seatMatrix, maintenanceStatus, templateId } = json;
+    const { plateNumber, isActive, seatMatrix, maintenanceStatus, templateId } =
+      json;
 
     // Check if bus exists
     const existingBus = await prisma.bus.findUnique({
@@ -70,10 +68,7 @@ export async function PATCH(
     });
 
     if (!existingBus) {
-      return NextResponse.json(
-        { error: "Bus not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Bus not found" }, { status: 404 });
     }
 
     // If updating plate number, check if it's already in use
@@ -96,8 +91,10 @@ export async function PATCH(
       data: {
         plateNumber: plateNumber !== undefined ? plateNumber : undefined,
         isActive: isActive !== undefined ? isActive : undefined,
-        seatMatrix: seatMatrix !== undefined ? JSON.stringify(seatMatrix) : undefined,
-        maintenanceStatus: maintenanceStatus !== undefined ? maintenanceStatus : undefined,
+        seatMatrix:
+          seatMatrix !== undefined ? JSON.stringify(seatMatrix) : undefined,
+        maintenanceStatus:
+          maintenanceStatus !== undefined ? maintenanceStatus : undefined,
         templateId: templateId !== undefined ? templateId : undefined,
       },
       include: {
@@ -125,10 +122,10 @@ export async function PATCH(
 // Delete a bus
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+    const { id } = params;
 
     // Check if bus exists
     const existingBus = await prisma.bus.findUnique({
@@ -144,14 +141,14 @@ export async function DELETE(
     });
 
     if (!existingBus) {
-      return NextResponse.json(
-        { error: "Bus not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Bus not found" }, { status: 404 });
     }
 
     // Check if bus has associated assignments or schedules
-    if (existingBus._count.assignments > 0 || existingBus._count.schedules > 0) {
+    if (
+      existingBus._count.assignments > 0 ||
+      existingBus._count.schedules > 0
+    ) {
       return NextResponse.json(
         { error: "Cannot delete bus with associated assignments or schedules" },
         { status: 400 }

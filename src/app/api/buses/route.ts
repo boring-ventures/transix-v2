@@ -6,14 +6,32 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get("companyId");
-    const isActive = searchParams.get("isActive") === "true";
+    const isActiveParam = searchParams.get("isActive");
+
+    console.log("Buses API - Raw isActive param:", isActiveParam);
+
+    // Only set isActive in the query if the parameter is explicitly provided
+    let isActive: boolean | undefined;
+    if (isActiveParam !== null) {
+      isActive = isActiveParam === "true";
+    }
+
     const templateId = searchParams.get("templateId");
+
+    console.log("Buses API - Query params:", {
+      companyId,
+      isActive,
+      templateId,
+    });
 
     // Build the query
     const query: Prisma.BusWhereInput = {};
     if (companyId) query.companyId = companyId;
+    // Only add isActive to query if it's not undefined
     if (isActive !== undefined) query.isActive = isActive;
     if (templateId) query.templateId = templateId;
+
+    console.log("Buses API - Final query:", query);
 
     // Fetch buses
     const buses = await prisma.bus.findMany({
@@ -26,6 +44,14 @@ export async function GET(req: Request) {
         plateNumber: "asc",
       },
     });
+
+    console.log(`Buses API - Found ${buses.length} buses`);
+
+    if (buses.length === 0) {
+      // If no buses found, log a message and check if there are any buses at all
+      const totalBuses = await prisma.bus.count();
+      console.log(`Buses API - Total buses in database: ${totalBuses}`);
+    }
 
     // Parse JSON strings back to objects
     const parsedBuses = buses.map((bus) => ({
@@ -153,7 +179,7 @@ export async function POST(req: Request) {
     const allSeats = [];
 
     // Process first floor seats
-    if (seatMatrix.firstFloor && seatMatrix.firstFloor.seats) {
+    if (seatMatrix.firstFloor?.seats) {
       const firstFloorSeats = seatMatrix.firstFloor.seats
         .filter((seat) => !seat.isEmpty)
         .map((seat) => ({
@@ -171,7 +197,7 @@ export async function POST(req: Request) {
     }
 
     // Process second floor seats if they exist
-    if (seatMatrix.secondFloor && seatMatrix.secondFloor.seats) {
+    if (seatMatrix.secondFloor?.seats) {
       const secondFloorSeats = seatMatrix.secondFloor.seats
         .filter((seat: Seat) => !seat.isEmpty)
         .map((seat: Seat) => ({
