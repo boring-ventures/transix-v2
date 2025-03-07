@@ -10,9 +10,9 @@ export type BusTemplate = {
   description?: string;
   companyId: string;
   totalCapacity: number;
-  seatTemplateMatrix: SeatTemplateMatrix; // This should be properly typed based on your matrix structure
+  seatTemplateMatrix: SeatTemplateMatrix;
   type: string;
-  seatsLayout: SeatMatrixFloor; // This should be properly typed based on your layout structure
+  seatsLayout: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -27,40 +27,66 @@ export type BusTemplateFormData = {
   description?: string;
   companyId: string;
   totalCapacity: number;
-  seatTemplateMatrix: SeatTemplateMatrix; // This should match your matrix structure
+  seatTemplateMatrix: SeatTemplateMatrix;
   type: string;
-  seatsLayout: SeatMatrixFloor; // This should match your layout structure
+  seatsLayout: string;
   isActive?: boolean;
 };
 
+/**
+ * Represents the dimensions of a floor in a bus seat matrix
+ */
 export interface SeatMatrixDimensions {
   rows: number;
   seatsPerRow: number;
 }
 
+/**
+ * Represents a single seat position in the bus
+ */
 export interface SeatPosition {
-  id: string;
-  name: string;
-  row: number;
-  column: number;
-  tierId: string;
-  isEmpty: boolean;
-  status: string;
+  id: string; // Unique identifier for the seat (e.g., "1A", "21B")
+  name: string; // Display name for the seat
+  row: number; // Zero-based row index
+  column: number; // Zero-based column index
+  tierId: string; // ID of the seat tier (e.g., "economy", "business")
+  isEmpty: boolean; // Whether this position is empty (not a seat)
+  status: string; // Initial status of the seat ("available", "maintenance")
+  floor?: "first" | "second"; // Which floor the seat belongs to
 }
 
+/**
+ * Represents a floor in the bus seat matrix
+ */
 export interface SeatMatrixFloor {
-  dimensions: SeatMatrixDimensions;
-  seats: SeatPosition[];
+  dimensions: SeatMatrixDimensions; // Dimensions of this floor
+  seats: SeatPosition[]; // Array of seats on this floor
 }
 
-export interface SeatMatrix {
-  firstFloor: SeatMatrixFloor;
-  secondFloor?: SeatMatrixFloor;
-}
-
+/**
+ * Represents the complete seat matrix for a bus
+ */
 export interface SeatTemplateMatrix {
-  firstFloor: SeatMatrixFloor;
-  secondFloor?: SeatMatrixFloor;
+  firstFloor: SeatMatrixFloor; // First floor configuration
+  secondFloor?: SeatMatrixFloor; // Optional second floor configuration
+}
+
+/**
+ * Enum for seat layout types
+ */
+export enum SeatLayoutType {
+  SINGLE_FLOOR = "single_floor",
+  DOUBLE_FLOOR = "double_floor",
+}
+
+/**
+ * Enum for bus types
+ */
+export enum BusType {
+  STANDARD = "standard",
+  LUXURY = "luxury",
+  MINIBUS = "minibus",
+  DOUBLE_DECKER = "double_decker"
 }
 
 export function useBusTemplates(companyId?: string, fetchInactive = false) {
@@ -111,14 +137,10 @@ export function useBusTemplates(companyId?: string, fetchInactive = false) {
       });
     },
     onError: (error) => {
-      const errorMessage =
-        axios.isAxiosError(error) && error.response?.data?.error
-          ? error.response.data.error
-          : "Error al crear la plantilla de bus";
-      
+      console.error("Error creating bus template:", error);
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "Error al crear la plantilla de bus",
         variant: "destructive",
       });
     },
@@ -126,7 +148,13 @@ export function useBusTemplates(companyId?: string, fetchInactive = false) {
 
   // Update an existing bus template
   const updateTemplate = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<BusTemplateFormData> }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Partial<BusTemplateFormData>;
+    }) => {
       const response = await axios.patch(`/api/bus-templates/${id}`, data);
       return response.data.template;
     },
@@ -138,14 +166,10 @@ export function useBusTemplates(companyId?: string, fetchInactive = false) {
       });
     },
     onError: (error) => {
-      const errorMessage =
-        axios.isAxiosError(error) && error.response?.data?.error
-          ? error.response.data.error
-          : "Error al actualizar la plantilla de bus";
-      
+      console.error("Error updating bus template:", error);
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "Error al actualizar la plantilla de bus",
         variant: "destructive",
       });
     },
@@ -165,14 +189,10 @@ export function useBusTemplates(companyId?: string, fetchInactive = false) {
       });
     },
     onError: (error) => {
-      const errorMessage =
-        axios.isAxiosError(error) && error.response?.data?.error
-          ? error.response.data.error
-          : "Error al eliminar la plantilla de bus";
-      
+      console.error("Error deleting bus template:", error);
       toast({
         title: "Error",
-        description: errorMessage,
+        description: "Error al eliminar la plantilla de bus",
         variant: "destructive",
       });
     },

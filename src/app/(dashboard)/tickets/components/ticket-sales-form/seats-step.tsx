@@ -9,6 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
 import { useSchedules } from "@/hooks/use-schedules";
@@ -51,8 +52,12 @@ export function SeatsStep({
     }>;
     bookedSeatIds: string[];
     busId: string;
+    originalSeatMatrix?: any;
   } | null>(null);
   const [showAllSeats, setShowAllSeats] = useState(false);
+  const [activeFloor, setActiveFloor] = useState<"firstFloor" | "secondFloor">(
+    "firstFloor"
+  );
 
   // Fetch data from API
   const { locations } = useLocations();
@@ -108,6 +113,15 @@ export function SeatsStep({
 
   // Get all seats for display
   const allSeats = debugData?.allSeats || [];
+
+  // Get seat matrix for structured display
+  const seatMatrix = availabilityData?.seatMatrix || {
+    firstFloor: { dimensions: { rows: 0, seatsPerRow: 0 }, seats: [] },
+    secondFloor: undefined,
+  };
+
+  // Determine if bus has a second floor
+  const hasSecondFloor = !!seatMatrix.secondFloor;
 
   // Determine which seats to display
   const displaySeats = showAllSeats ? allSeats : availableSeats;
@@ -182,8 +196,8 @@ export function SeatsStep({
   }
 
   // Show message if no seats at all
-  {
-    displaySeats.length === 0 && (
+  if (displaySeats.length === 0) {
+    return (
       <div className="p-8 text-center">
         <p className="text-muted-foreground mb-4">
           No hay asientos configurados para este bus.
@@ -237,6 +251,144 @@ export function SeatsStep({
     );
   }
 
+  // Render a seat
+  const renderSeat = (seat) => {
+    if (!seat) return null;
+
+    // Find the seat in our processed seats array to get availability info
+    const seatInfo = seats.find((s) => s.id === seat.id) || seat;
+
+    const isSelected = formData.selectedSeats.includes(seat.id);
+    const isAvailable = !seat.isEmpty && seatInfo.isAvailable !== false;
+
+    return (
+      <div key={seat.id} className="relative">
+        <button
+          type="button"
+          disabled={!isAvailable || seat.isEmpty}
+          className={cn(
+            "w-full p-3 border rounded-md flex flex-col items-center justify-center transition-colors",
+            seat.isEmpty
+              ? "bg-transparent border-dashed border-gray-300"
+              : isSelected
+                ? "bg-primary text-primary-foreground border-primary"
+                : isAvailable
+                  ? "hover:bg-primary/10"
+                  : "bg-muted text-muted-foreground cursor-not-allowed"
+          )}
+          onClick={() => {
+            if (!isAvailable || seat.isEmpty) return;
+
+            if (isSelected) {
+              // Remove seat and its passenger data
+              updateFormData({
+                selectedSeats: formData.selectedSeats.filter(
+                  (id) => id !== seat.id
+                ),
+                passengers: formData.passengers.filter(
+                  (p) => p.seatNumber !== seat.name
+                ),
+              });
+              if (expandedPassenger === seat.name) {
+                setExpandedPassenger(null);
+              }
+            } else {
+              // Add seat and initialize passenger data
+              const newPassenger = {
+                fullName: "",
+                documentId: "",
+                seatNumber: seat.name,
+                busSeatId: seat.id,
+              };
+              updateFormData({
+                selectedSeats: [...formData.selectedSeats, seat.id],
+                passengers: [...formData.passengers, newPassenger],
+              });
+              setExpandedPassenger(seat.name);
+            }
+          }}
+        >
+          {!seat.isEmpty && (
+            <>
+              <span className="text-lg font-medium">{seat.name}</span>
+              {seatInfo.tier && (
+                <>
+                  <span className="text-xs">{seatInfo.tier.name}</span>
+                  <span className="text-xs mt-1">
+                    ${seatInfo.tier.basePrice || 0}
+                  </span>
+                </>
+              )}
+              {!isAvailable && seatInfo.isBooked && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1 rounded-full">
+                  Reservado
+                </span>
+              )}
+              {!isAvailable && !seatInfo.isBooked && (
+                <span className="absolute -top-2 -right-2 bg-gray-500 text-white text-xs px-1 rounded-full">
+                  Mantenimiento
+                </span>
+              )}
+            </>
+          )}
+        </button>
+      </div>
+    );
+  };
+
+  // Render a floor of seats
+  const renderSeatMatrix = (floorKey: "firstFloor" | "secondFloor") => {
+    const floor = seatMatrix[floorKey];
+    if (
+      !floor ||
+      !floor.dimensions ||
+      !floor.seats ||
+      floor.seats.length === 0
+    ) {
+      return (
+        <div className="text-center p-4">
+          No hay asientos configurados para este piso.
+        </div>
+      );
+    }
+
+    const { rows, seatsPerRow } = floor.dimensions;
+
+    // Create a 2D grid to place seats in their correct positions
+    const grid = Array(rows)
+      .fill(null)
+      .map(() => Array(seatsPerRow).fill(null));
+
+    // Place seats in the grid
+    floor.seats.forEach((seat) => {
+      if (
+        seat.row >= 0 &&
+        seat.row < rows &&
+        seat.column >= 0 &&
+        seat.column < seatsPerRow
+      ) {
+        grid[seat.row][seat.column] = seat;
+      }
+    });
+
+    return (
+      <div className="space-y-2">
+        {grid.map((rowSeats, rowIndex) => (
+          <div
+            key={`${floorKey}-row-${rowIndex}`}
+            className="flex gap-2 justify-center"
+          >
+            {rowSeats.map((seat, colIndex) => (
+              <div key={`${floorKey}-${rowIndex}-${colIndex}`} className="w-16">
+                {seat ? renderSeat(seat) : <div className="w-full h-16"></div>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -270,205 +422,153 @@ export function SeatsStep({
         </div>
       )}
 
-      {displaySeats.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left side: Seat selection */}
-          <div className="md:col-span-2">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                Bus
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              {seats.map((seat) => {
-                const isSelected = formData.selectedSeats.includes(seat.id);
-                const isAvailable = seat.isAvailable;
-
-                return (
-                  <div key={seat.id} className="relative">
-                    <button
-                      type="button"
-                      disabled={!isAvailable}
-                      className={cn(
-                        "w-full p-3 border rounded-md flex flex-col items-center justify-center transition-colors",
-                        isSelected
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : isAvailable
-                            ? "hover:bg-primary/10"
-                            : "bg-muted text-muted-foreground cursor-not-allowed"
-                      )}
-                      onClick={() => {
-                        if (!isAvailable) return;
-
-                        if (isSelected) {
-                          // Remove seat and its passenger data
-                          updateFormData({
-                            selectedSeats: formData.selectedSeats.filter(
-                              (id) => id !== seat.id
-                            ),
-                            passengers: formData.passengers.filter(
-                              (p) => p.seatNumber !== seat.seatNumber
-                            ),
-                          });
-                          if (expandedPassenger === seat.seatNumber) {
-                            setExpandedPassenger(null);
-                          }
-                        } else {
-                          // Add seat and initialize passenger data
-                          const newPassenger = {
-                            fullName: "",
-                            documentId: "",
-                            seatNumber: seat.seatNumber,
-                            busSeatId: seat.id,
-                          };
-                          updateFormData({
-                            selectedSeats: [...formData.selectedSeats, seat.id],
-                            passengers: [...formData.passengers, newPassenger],
-                          });
-                          setExpandedPassenger(seat.seatNumber);
-                        }
-                      }}
-                    >
-                      <span className="text-lg font-medium">
-                        {seat.seatNumber}
-                      </span>
-                      <span className="text-xs">{seat.tier?.name}</span>
-                      <span className="text-xs mt-1">
-                        ${seat.tier?.basePrice || 0}
-                      </span>
-                      {!isAvailable && seat.isBooked && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1 rounded-full">
-                          Reservado
-                        </span>
-                      )}
-                      {!isAvailable && !seat.isBooked && (
-                        <span className="absolute -top-2 -right-2 bg-gray-500 text-white text-xs px-1 rounded-full">
-                          Mantenimiento
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center justify-between mt-6 pt-4 border-t">
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-sm bg-primary" />
-                  <span className="text-sm">Seleccionado</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-sm border" />
-                  <span className="text-sm">Disponible</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded-sm bg-muted" />
-                  <span className="text-sm">No disponible</span>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Left side: Seat selection */}
+        <div className="md:col-span-2">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+              Bus
             </div>
           </div>
 
-          {/* Right side: Passenger details and summary */}
-          <div>
-            <div className="bg-muted p-4 rounded-md mb-4">
-              <h4 className="font-medium mb-2">Resumen de selección</h4>
-              <p>Asientos seleccionados: {formData.selectedSeats.length}</p>
-              <p className="font-medium mt-2">
-                Total: ${calculateTotalPrice()}
-              </p>
-            </div>
+          {hasSecondFloor ? (
+            <Tabs
+              defaultValue="firstFloor"
+              onValueChange={(value) =>
+                setActiveFloor(value as "firstFloor" | "secondFloor")
+              }
+            >
+              <TabsList className="mb-4 w-full">
+                <TabsTrigger value="firstFloor" className="flex-1">
+                  Primer Piso
+                </TabsTrigger>
+                <TabsTrigger value="secondFloor" className="flex-1">
+                  Segundo Piso
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="firstFloor">
+                {renderSeatMatrix("firstFloor")}
+              </TabsContent>
+              <TabsContent value="secondFloor">
+                {renderSeatMatrix("secondFloor")}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            renderSeatMatrix("firstFloor")
+          )}
 
-            <h4 className="font-medium mb-4">Detalles de pasajeros</h4>
-
-            {formData.selectedSeats.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center p-6 border rounded-md bg-muted/20">
-                <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  Seleccione asientos para ingresar los datos de los pasajeros
-                </p>
+          <div className="flex items-center justify-between mt-6 pt-4 border-t">
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-sm bg-primary" />
+                <span className="text-sm">Seleccionado</span>
               </div>
-            ) : (
-              <Accordion
-                type="single"
-                collapsible
-                value={expandedPassenger || undefined}
-                onValueChange={(value) => setExpandedPassenger(value)}
-              >
-                {formData.passengers.map((passenger, index) => (
-                  <AccordionItem
-                    key={passenger.seatNumber}
-                    value={passenger.seatNumber}
-                  >
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center justify-between w-full">
-                        <span>
-                          Pasajero {index + 1} - Asiento {passenger.seatNumber}
-                        </span>
-                        {passenger.fullName && passenger.documentId && (
-                          <div className="h-4 w-4 rounded-full bg-green-500 flex items-center justify-center">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-3 w-3 text-white"
-                              aria-hidden="true"
-                              title="Datos completos"
-                            >
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4 mt-2">
-                        <div className="space-y-2">
-                          <Label htmlFor={`fullName-${index}`}>
-                            Nombre completo
-                          </Label>
-                          <Input
-                            id={`fullName-${index}`}
-                            value={passenger.fullName}
-                            onChange={(e) => {
-                              const newPassengers = [...formData.passengers];
-                              newPassengers[index].fullName = e.target.value;
-                              updateFormData({ passengers: newPassengers });
-                            }}
-                            placeholder="Nombre y apellidos"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`documentId-${index}`}>
-                            Documento de identidad
-                          </Label>
-                          <Input
-                            id={`documentId-${index}`}
-                            value={passenger.documentId}
-                            onChange={(e) => {
-                              const newPassengers = [...formData.passengers];
-                              newPassengers[index].documentId = e.target.value;
-                              updateFormData({ passengers: newPassengers });
-                            }}
-                            placeholder="Número de documento"
-                          />
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            )}
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-sm border" />
+                <span className="text-sm">Disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-sm bg-muted" />
+                <span className="text-sm">No disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-sm border border-dashed border-gray-300" />
+                <span className="text-sm">Espacio vacío</span>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Right side: Passenger details and summary */}
+        <div>
+          <div className="bg-muted p-4 rounded-md mb-4">
+            <h4 className="font-medium mb-2">Resumen de selección</h4>
+            <p>Asientos seleccionados: {formData.selectedSeats.length}</p>
+            <p className="font-medium mt-2">Total: ${calculateTotalPrice()}</p>
+          </div>
+
+          <h4 className="font-medium mb-4">Detalles de pasajeros</h4>
+
+          {formData.selectedSeats.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center p-6 border rounded-md bg-muted/20">
+              <Users className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">
+                Seleccione asientos para ingresar los datos de los pasajeros
+              </p>
+            </div>
+          ) : (
+            <Accordion
+              type="single"
+              collapsible
+              value={expandedPassenger || undefined}
+              onValueChange={(value) => setExpandedPassenger(value)}
+            >
+              {formData.passengers.map((passenger, index) => (
+                <AccordionItem
+                  key={passenger.seatNumber}
+                  value={passenger.seatNumber}
+                >
+                  <AccordionTrigger>
+                    <div className="flex items-center">
+                      <span className="font-medium mr-2">
+                        Asiento {passenger.seatNumber}
+                      </span>
+                      {passenger.fullName ? (
+                        <span className="text-sm text-muted-foreground">
+                          {passenger.fullName}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-red-500">
+                          Datos pendientes
+                        </span>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor={`fullName-${index}`}>
+                          Nombre completo
+                        </Label>
+                        <Input
+                          id={`fullName-${index}`}
+                          value={passenger.fullName}
+                          onChange={(e) => {
+                            const updatedPassengers = [...formData.passengers];
+                            updatedPassengers[index].fullName = e.target.value;
+                            updateFormData({
+                              passengers: updatedPassengers,
+                            });
+                          }}
+                          placeholder="Nombre completo del pasajero"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`documentId-${index}`}>
+                          Número de documento
+                        </Label>
+                        <Input
+                          id={`documentId-${index}`}
+                          value={passenger.documentId}
+                          onChange={(e) => {
+                            const updatedPassengers = [...formData.passengers];
+                            updatedPassengers[index].documentId =
+                              e.target.value;
+                            updateFormData({
+                              passengers: updatedPassengers,
+                            });
+                          }}
+                          placeholder="Número de documento"
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -106,6 +106,9 @@ export async function GET(req: Request) {
       isActive: scheduleSeat.isActive,
       seatNumber: scheduleSeat.busSeat.seatNumber,
       tierId: scheduleSeat.busSeat.tierId,
+      floor: scheduleSeat.busSeat.floor || "first", // Default to first floor if not specified
+      row: scheduleSeat.busSeat.row,
+      column: scheduleSeat.busSeat.column,
       isBooked: bookedSeatIds.includes(scheduleSeat.busSeatId),
       isAvailable:
         scheduleSeat.isActive &&
@@ -136,11 +139,35 @@ export async function GET(req: Request) {
       {} as Record<string, typeof availableSeats>
     );
 
+    // Get the original seat matrix from the bus to preserve the exact arrangement
+    const originalSeatMatrix = schedule.bus?.seatMatrix
+      ? JSON.parse(schedule.bus.seatMatrix as string)
+      : null;
+
+    // Create a seat matrix that preserves the original arrangement but updates seat status
+    const seatMatrix = originalSeatMatrix
+      ? createSeatMatrixWithStatus(
+          originalSeatMatrix,
+          processedSeats,
+          bookedSeatIds
+        )
+      : {
+          firstFloor: organizeSeatsIntoMatrix(
+            processedSeats.filter((s) => s.floor === "first")
+          ),
+          secondFloor: processedSeats.some((s) => s.floor === "second")
+            ? organizeSeatsIntoMatrix(
+                processedSeats.filter((s) => s.floor === "second")
+              )
+            : undefined,
+        };
+
     // Include debugging information if requested
     const response = {
       schedule,
       availableSeats,
       seatsByTier,
+      seatMatrix,
       totalAvailable: availableSeats.length,
       totalCapacity: processedSeats.length,
       occupancyRate:
@@ -157,6 +184,7 @@ export async function GET(req: Request) {
           allSeats: processedSeats,
           bookedSeatIds,
           busId: schedule.busId,
+          originalSeatMatrix,
         },
       });
     }
@@ -169,4 +197,106 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
+}
+
+// Helper function to create a seat matrix that preserves the original arrangement
+// but updates seat status based on processed seats and booked seats
+function createSeatMatrixWithStatus(
+  originalMatrix,
+  processedSeats,
+  bookedSeatIds
+) {
+  const result = {
+    firstFloor: {
+      dimensions: originalMatrix.firstFloor.dimensions,
+      seats: [],
+    },
+  };
+
+  // Process first floor seats
+  if (originalMatrix.firstFloor && originalMatrix.firstFloor.seats) {
+    result.firstFloor.seats = originalMatrix.firstFloor.seats.map(
+      (originalSeat) => {
+        // Find the corresponding processed seat
+        const processedSeat = processedSeats.find(
+          (s) => s.seatNumber === originalSeat.id
+        );
+
+        if (!processedSeat) {
+          // If no processed seat found, keep the original but mark as unavailable
+          return {
+            ...originalSeat,
+            isAvailable: false,
+            isBooked: false,
+            floor: "first",
+          };
+        }
+
+        // Update with processed seat information
+        return {
+          ...originalSeat,
+          status: processedSeat.status,
+          isActive: processedSeat.isActive,
+          isBooked: bookedSeatIds.includes(processedSeat.id),
+          isAvailable: processedSeat.isAvailable,
+          tier: processedSeat.tier,
+          floor: "first",
+        };
+      }
+    );
+  }
+
+  // Process second floor if it exists
+  if (originalMatrix.secondFloor && originalMatrix.secondFloor.seats) {
+    result.secondFloor = {
+      dimensions: originalMatrix.secondFloor.dimensions,
+      seats: originalMatrix.secondFloor.seats.map((originalSeat) => {
+        // Find the corresponding processed seat
+        const processedSeat = processedSeats.find(
+          (s) => s.seatNumber === originalSeat.id
+        );
+
+        if (!processedSeat) {
+          // If no processed seat found, keep the original but mark as unavailable
+          return {
+            ...originalSeat,
+            isAvailable: false,
+            isBooked: false,
+            floor: "second",
+          };
+        }
+
+        // Update with processed seat information
+        return {
+          ...originalSeat,
+          status: processedSeat.status,
+          isActive: processedSeat.isActive,
+          isBooked: bookedSeatIds.includes(processedSeat.id),
+          isAvailable: processedSeat.isAvailable,
+          tier: processedSeat.tier,
+          floor: "second",
+        };
+      }),
+    };
+  }
+
+  return result;
+}
+
+// Helper function to organize seats into a matrix format
+function organizeSeatsIntoMatrix(seats) {
+  if (!seats || seats.length === 0)
+    return { dimensions: { rows: 0, seatsPerRow: 0 }, seats: [] };
+
+  // Find the maximum row and column to determine dimensions
+  const maxRow = Math.max(...seats.map((seat) => seat.row)) + 1;
+  const maxColumn = Math.max(...seats.map((seat) => seat.column)) + 1;
+
+  return {
+    dimensions: {
+      rows: maxRow,
+      seatsPerRow: maxColumn,
+    },
+    seats: seats,
+  };
 } 

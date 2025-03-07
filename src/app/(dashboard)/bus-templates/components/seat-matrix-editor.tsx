@@ -16,31 +16,13 @@ import type { SeatTier } from "@/hooks/use-seat-tiers";
 import { EditSeatDialog } from "./edit-seat-dialog";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface SeatPosition {
-  id: string;
-  name: string;
-  row: number;
-  column: number;
-  tierId: string;
-  isEmpty: boolean;
-  status: string;
-}
-
-interface SeatMatrixDimensions {
-  rows: number;
-  seatsPerRow: number;
-}
-
-interface SeatMatrixFloor {
-  dimensions: SeatMatrixDimensions;
-  seats: SeatPosition[];
-}
-
-interface SeatTemplateMatrix {
-  firstFloor: SeatMatrixFloor;
-  secondFloor?: SeatMatrixFloor;
-}
+import {
+  SeatPosition,
+  SeatMatrixDimensions,
+  SeatMatrixFloor,
+  SeatTemplateMatrix,
+  SeatLayoutType,
+} from "@/hooks/use-bus-templates";
 
 interface SeatMatrixEditorProps {
   value: SeatTemplateMatrix;
@@ -79,50 +61,58 @@ export function SeatMatrixEditor({
     isSecondFloor = false
   ): SeatPosition[] => {
     const seats: SeatPosition[] = [];
+    const floorPrefix = isSecondFloor ? "2" : "";
+    const floorType = isSecondFloor ? "second" : "first";
+
     for (let row = 0; row < dimensions.rows; row++) {
       for (let col = 0; col < dimensions.seatsPerRow; col++) {
         const name = `${row + 1}${String.fromCharCode(65 + col)}`;
-        const seatId = isSecondFloor ? `2${name}` : name;
+        const seatId = `${floorPrefix}${name}`;
         const existingSeat = existingSeats.find((s) => s.id === seatId);
-        
+
         if (existingSeat) {
-          seats.push(existingSeat);
+          // Ensure the floor property is set correctly
+          seats.push({
+            ...existingSeat,
+            floor: floorType,
+          });
         } else {
           seats.push({
             id: seatId,
-            name: isSecondFloor ? `2${name}` : name,
+            name: seatId,
             row,
             column: col,
             tierId: "",
             isEmpty: false,
             status: "available",
+            floor: floorType,
           });
         }
       }
     }
     return seats;
   };
-  
-  // Update dimensions
+
+  // Update dimensions for a floor
   const updateDimensions = (
     floor: "firstFloor" | "secondFloor",
     newDimensions: SeatMatrixDimensions
   ) => {
+    const isSecondFloor = floor === "secondFloor";
     const currentMatrix = { ...value };
-    const currentFloor = currentMatrix[floor];
-    
-    if (floor === "firstFloor") {
-      setFirstFloorDimensions(newDimensions);
-    } else {
-      setSecondFloorDimensions(newDimensions);
-    }
-    
+    const currentFloor = currentMatrix[floor] || {
+      dimensions: newDimensions,
+      seats: [],
+    };
+
+    // Generate new seats based on the new dimensions
     const newSeats = generateSeats(
       newDimensions,
-      currentFloor?.seats || [],
-      floor === "secondFloor"
+      currentFloor.seats,
+      isSecondFloor
     );
-    
+
+    // Update the matrix with the new floor configuration
     const updatedMatrix = {
       ...currentMatrix,
       [floor]: {
@@ -130,250 +120,284 @@ export function SeatMatrixEditor({
         seats: newSeats,
       },
     };
-    
+
+    // Update the dimensions state
+    if (floor === "firstFloor") {
+      setFirstFloorDimensions(newDimensions);
+    } else {
+      setSecondFloorDimensions(newDimensions);
+    }
+
+    // Notify parent component of the change
     onChange(updatedMatrix);
   };
-  
+
   // Toggle second floor
   const handleToggleSecondFloor = (checked: boolean) => {
     setHasSecondFloor(checked);
-    
+
     const updatedMatrix = { ...value };
-    
+
     if (checked && !updatedMatrix.secondFloor) {
+      // Add second floor if it doesn't exist
       updatedMatrix.secondFloor = {
         dimensions: secondFloorDimensions,
         seats: generateSeats(secondFloorDimensions, [], true),
       };
     } else if (!checked && updatedMatrix.secondFloor) {
-      // Remove the second floor completely
-      updatedMatrix.secondFloor = undefined;
+      // Remove second floor if it exists
+      delete updatedMatrix.secondFloor;
     }
-    
+
     onChange(updatedMatrix);
   };
-  
+
   // Handle seat click
-  const handleSeatClick = (seat: SeatPosition, floor: "firstFloor" | "secondFloor") => {
+  const handleSeatClick = (
+    seat: SeatPosition,
+    floor: "firstFloor" | "secondFloor"
+  ) => {
     if (isMultiSelectMode) {
-      setSelectedSeats(prev => 
-        prev.includes(seat.id)
-          ? prev.filter(id => id !== seat.id)
-          : [...prev, seat.id]
-      );
-      return;
+      // In multi-select mode, toggle selection
+      setSelectedSeats((prev) => {
+        const seatKey = `${floor}-${seat.id}`;
+        return prev.includes(seatKey)
+          ? prev.filter((id) => id !== seatKey)
+          : [...prev, seatKey];
+      });
+    } else {
+      // In single-select mode, open edit dialog
+      setSelectedSeat(seat);
+      setSelectedFloor(floor);
     }
-    
-    setSelectedSeat(seat);
-    setSelectedFloor(floor);
   };
-  
-  // Update seat
+
+  // Handle seat update
   const handleUpdateSeat = (updatedSeat: SeatPosition) => {
-    const currentMatrix = { ...value };
-    const currentFloor = currentMatrix[selectedFloor];
-    
-    if (!currentFloor) return;
-    
-    const seatIndex = currentFloor.seats.findIndex(s => s.id === updatedSeat.id);
-    
-    if (seatIndex === -1) return;
-    
-    const updatedSeats = [...currentFloor.seats];
-    updatedSeats[seatIndex] = updatedSeat;
-    
-    const updatedMatrix = {
-      ...currentMatrix,
-      [selectedFloor]: {
-        ...currentFloor,
-        seats: updatedSeats,
-      },
-    };
-    
-    onChange(updatedMatrix);
+    if (!selectedFloor) return;
+
+    const updatedMatrix = { ...value };
+    const floorData = updatedMatrix[selectedFloor];
+
+    if (floorData) {
+      // Update the seat in the floor
+      const seatIndex = floorData.seats.findIndex(
+        (s) => s.id === updatedSeat.id
+      );
+      if (seatIndex !== -1) {
+        floorData.seats[seatIndex] = {
+          ...updatedSeat,
+          floor: selectedFloor === "firstFloor" ? "first" : "second",
+        };
+      }
+    }
+
+    // Clear selection and notify parent
     setSelectedSeat(null);
+    onChange(updatedMatrix);
   };
-  
-  // Bulk actions
-  const handleBulkAction = (action: "empty" | "fill" | "tier", tierId?: string) => {
+
+  // Handle bulk actions on selected seats
+  const handleBulkAction = (
+    action: "empty" | "fill" | "tier",
+    tierId?: string
+  ) => {
     if (selectedSeats.length === 0) return;
-    
-    const currentMatrix = { ...value };
-    const updatedMatrix = { ...currentMatrix };
-    
-    // Update first floor seats
-    if (updatedMatrix.firstFloor) {
-      updatedMatrix.firstFloor = {
-        ...updatedMatrix.firstFloor,
-        seats: updatedMatrix.firstFloor.seats.map(seat => {
-          if (!selectedSeats.includes(seat.id)) return seat;
-          
-          switch (action) {
-            case "empty":
-              return { ...seat, isEmpty: true, tierId: "" };
-            case "fill":
-              return { ...seat, isEmpty: false };
-            case "tier":
-              return { ...seat, isEmpty: false, tierId: tierId || "" };
-            default:
-              return seat;
+
+    const updatedMatrix = { ...value };
+
+    // Process each selected seat
+    selectedSeats.forEach((seatKey) => {
+      const [floor, seatId] = seatKey.split("-") as [
+        "firstFloor" | "secondFloor",
+        string,
+      ];
+      const floorData = updatedMatrix[floor];
+
+      if (floorData) {
+        const seatIndex = floorData.seats.findIndex((s) => s.id === seatId);
+        if (seatIndex !== -1) {
+          if (action === "empty") {
+            // Mark seat as empty
+            floorData.seats[seatIndex] = {
+              ...floorData.seats[seatIndex],
+              isEmpty: true,
+              tierId: "",
+            };
+          } else if (action === "fill") {
+            // Mark seat as filled
+            floorData.seats[seatIndex] = {
+              ...floorData.seats[seatIndex],
+              isEmpty: false,
+            };
+          } else if (action === "tier" && tierId) {
+            // Assign tier to seat
+            floorData.seats[seatIndex] = {
+              ...floorData.seats[seatIndex],
+              tierId,
+              isEmpty: false,
+            };
           }
-        }),
-      };
-    }
-    
-    // Update second floor seats
-    if (updatedMatrix.secondFloor) {
-      updatedMatrix.secondFloor = {
-        ...updatedMatrix.secondFloor,
-        seats: updatedMatrix.secondFloor.seats.map(seat => {
-          if (!selectedSeats.includes(seat.id)) return seat;
-          
-          switch (action) {
-            case "empty":
-              return { ...seat, isEmpty: true, tierId: "" };
-            case "fill":
-              return { ...seat, isEmpty: false };
-            case "tier":
-              return { ...seat, isEmpty: false, tierId: tierId || "" };
-            default:
-              return seat;
-          }
-        }),
-      };
-    }
-    
-    onChange(updatedMatrix);
+        }
+      }
+    });
+
+    // Clear selections and notify parent
     setSelectedSeats([]);
-  };
-  
-  // Add this function to handle bulk assignment of seat tiers
-  const handleBulkAssignTier = (floorKey: "firstFloor" | "secondFloor", tierId: string) => {
-    const currentMatrix = { ...value };
-    const currentFloor = currentMatrix[floorKey];
-    
-    if (!currentFloor) return;
-    
-    // Update all non-empty seats with the selected tier
-    const updatedSeats = currentFloor.seats.map(seat => 
-      seat.isEmpty ? seat : { ...seat, tierId }
-    );
-    
-    const updatedMatrix = {
-      ...currentMatrix,
-      [floorKey]: {
-        ...currentFloor,
-        seats: updatedSeats,
-      },
-    };
-    
+    setIsMultiSelectMode(false);
     onChange(updatedMatrix);
   };
-  
-  // Render a seat
-  const renderSeat = (seat: SeatPosition, floor: "firstFloor" | "secondFloor") => {
-    const tier = seatTiers.find(t => t.id === seat.tierId);
-    const isSelected = selectedSeats.includes(seat.id);
-    
+
+  // Handle bulk tier assignment
+  const handleBulkAssignTier = (
+    floorKey: "firstFloor" | "secondFloor",
+    tierId: string
+  ) => {
+    const updatedMatrix = { ...value };
+    const floorData = updatedMatrix[floorKey];
+
+    if (floorData) {
+      // Update all non-empty seats in the floor
+      floorData.seats = floorData.seats.map((seat) => {
+        if (!seat.isEmpty) {
+          return {
+            ...seat,
+            tierId,
+            floor: floorKey === "firstFloor" ? "first" : "second",
+          };
+        }
+        return seat;
+      });
+    }
+
+    onChange(updatedMatrix);
+  };
+
+  // Render a single seat
+  const renderSeat = (
+    seat: SeatPosition,
+    floor: "firstFloor" | "secondFloor"
+  ) => {
+    const seatKey = `${floor}-${seat.id}`;
+    const isSelected = selectedSeats.includes(seatKey);
+    const tier = seatTiers.find((t) => t.id === seat.tierId);
+
+    // Determine seat color based on tier and state
+    let bgColor = "bg-gray-200";
+    let textColor = "text-gray-700";
+
+    if (seat.isEmpty) {
+      bgColor = "bg-transparent";
+      textColor = "text-transparent";
+    } else if (tier) {
+      // Use tier color if available
+      bgColor = `bg-${tier.name.toLowerCase().replace(/\s+/g, "-")}-100`;
+      textColor = "text-gray-900";
+    }
+
+    if (isSelected) {
+      // Highlight selected seats
+      bgColor = "bg-primary-200";
+      textColor = "text-primary-900";
+    }
+
     return (
       <button
         key={seat.id}
-        type="button"
         className={cn(
-          "w-12 h-12 border rounded-md flex flex-col items-center justify-center cursor-pointer transition-all",
-          seat.isEmpty 
-            ? "border-dashed border-gray-300 bg-gray-50" 
-            : tier 
-              ? "bg-primary/10 border-primary" 
-              : "bg-gray-100 border-gray-300",
-          isSelected && "ring-2 ring-primary ring-offset-2"
+          "w-12 h-12 rounded-md flex items-center justify-center text-sm font-medium transition-colors",
+          bgColor,
+          textColor,
+          seat.isEmpty
+            ? "border border-dashed border-gray-300"
+            : "border border-gray-300",
+          isSelected ? "ring-2 ring-primary" : ""
         )}
         onClick={() => handleSeatClick(seat, floor)}
-        aria-label={`Seat ${seat.name}`}
       >
-        <span className="text-xs font-medium">{seat.name}</span>
-        {tier && !seat.isEmpty && (
-          <span className="text-[10px] text-primary-foreground bg-primary px-1 rounded mt-1">
-            {tier.name}
-          </span>
-        )}
+        {!seat.isEmpty && seat.name}
       </button>
     );
   };
-  
+
   // Render a floor
-  const renderFloor = (floorKey: "firstFloor" | "secondFloor", floorName: string) => {
-    const floor = value[floorKey];
-    if (!floor) return null;
-    
-    const { seats, dimensions } = floor;
-    const { rows, } = dimensions;
-    
-    // Group seats by row
-    const seatsByRow: SeatPosition[][] = [];
-    for (let i = 0; i < rows; i++) {
-      seatsByRow.push(seats.filter(seat => seat.row === i));
+  const renderFloor = (
+    floorKey: "firstFloor" | "secondFloor",
+    floorName: string
+  ) => {
+    const floorData = value[floorKey];
+    if (!floorData) return null;
+
+    const { dimensions, seats } = floorData;
+    const { rows, seatsPerRow } = dimensions;
+
+    // Create a grid of seats
+    const grid = [];
+    for (let row = 0; row < rows; row++) {
+      const rowSeats = [];
+      for (let col = 0; col < seatsPerRow; col++) {
+        const seat = seats.find((s) => s.row === row && s.column === col);
+        if (seat) {
+          rowSeats.push(renderSeat(seat, floorKey));
+        }
+      }
+      grid.push(
+        <div key={`${floorKey}-row-${row}`} className="flex gap-2 mb-2">
+          {rowSeats}
+        </div>
+      );
     }
-    
+
     return (
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
           <h3 className="text-lg font-medium">{floorName}</h3>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <Label htmlFor={`${floorKey}-rows`}>Filas:</Label>
-            <Input
-              id={`${floorKey}-rows`}
-              type="number"
-              min={1}
-              max={20}
-              value={floorKey === "firstFloor" ? firstFloorDimensions.rows : secondFloorDimensions.rows}
-              onChange={(e) => {
-                const newValue = Number.parseInt(e.target.value) || 1;
-                if (floorKey === "firstFloor") {
-                  updateDimensions(floorKey, { ...firstFloorDimensions, rows: newValue });
-                } else {
-                  updateDimensions(floorKey, { ...secondFloorDimensions, rows: newValue });
-                }
-              }}
-              className="w-20"
-            />
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Label htmlFor={`${floorKey}-cols`}>Asientos por fila:</Label>
-            <Input
-              id={`${floorKey}-cols`}
-              type="number"
-              min={1}
-              max={10}
-              value={floorKey === "firstFloor" ? firstFloorDimensions.seatsPerRow : secondFloorDimensions.seatsPerRow}
-              onChange={(e) => {
-                const newValue = Number.parseInt(e.target.value) || 1;
-                if (floorKey === "firstFloor") {
-                  updateDimensions(floorKey, { ...firstFloorDimensions, seatsPerRow: newValue });
-                } else {
-                  updateDimensions(floorKey, { ...secondFloorDimensions, seatsPerRow: newValue });
-                }
-              }}
-              className="w-20"
-            />
-          </div>
-          
-          
-        </div>
-        <div className="py-2">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label htmlFor={`${floorKey}-rows`}>Filas:</Label>
+              <Input
+                id={`${floorKey}-rows`}
+                type="number"
+                min="1"
+                max="20"
+                value={dimensions.rows}
+                className="w-16"
+                onChange={(e) => {
+                  const newRows = parseInt(e.target.value) || 1;
+                  updateDimensions(floorKey, {
+                    ...dimensions,
+                    rows: newRows,
+                  });
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor={`${floorKey}-cols`}>Asientos por fila:</Label>
+              <Input
+                id={`${floorKey}-cols`}
+                type="number"
+                min="1"
+                max="10"
+                value={dimensions.seatsPerRow}
+                className="w-16"
+                onChange={(e) => {
+                  const newCols = parseInt(e.target.value) || 1;
+                  updateDimensions(floorKey, {
+                    ...dimensions,
+                    seatsPerRow: newCols,
+                  });
+                }}
+              />
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
-                  Asignar Tipo a Todos <ChevronDown className="ml-2 h-4 w-4" />
+                  Asignar Tier <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                {seatTiers.map(tier => (
-                  <DropdownMenuItem 
+                {seatTiers.map((tier) => (
+                  <DropdownMenuItem
                     key={tier.id}
                     onClick={() => handleBulkAssignTier(floorKey, tier.id)}
                   >
@@ -383,76 +407,82 @@ export function SeatMatrixEditor({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        
-        <div className="space-y-2">
-          {seatsByRow.map((rowSeats) => (
-            <div key={`row-${rowSeats[0]?.row ?? Math.random()}`} className="flex gap-2">
-              {rowSeats.map(seat => renderSeat(seat, floorKey))}
-            </div>
-          ))}
         </div>
+        <div className="border rounded-lg p-4 bg-white">{grid}</div>
       </div>
     );
   };
-  
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="has-second-floor">Bus de dos pisos</Label>
-            <Switch
-              id="has-second-floor"
-              checked={hasSecondFloor}
-              onCheckedChange={handleToggleSecondFloor}
-            />
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Label htmlFor="multi-select">Selección múltiple</Label>
-            <Switch
-              id="multi-select"
-              checked={isMultiSelectMode}
-              onCheckedChange={(checked) => {
-                setIsMultiSelectMode(checked);
-                if (!checked) setSelectedSeats([]);
-              }}
-            />
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="multi-select"
+            checked={isMultiSelectMode}
+            onCheckedChange={(checked) => {
+              setIsMultiSelectMode(checked);
+              if (!checked) setSelectedSeats([]);
+            }}
+          />
+          <Label htmlFor="multi-select">Selección múltiple</Label>
         </div>
-        
-        {isMultiSelectMode && selectedSeats.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {selectedSeats.length} asientos seleccionados
-            </span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  Acciones <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleBulkAction("empty")}>
-                  Marcar como espacio vacío
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleBulkAction("fill")}>
-                  Marcar como asiento
-                </DropdownMenuItem>
-                {seatTiers.map(tier => (
-                  <DropdownMenuItem
-                    key={tier.id}
-                    onClick={() => handleBulkAction("tier", tier.id)}
-                  >
-                    Asignar tipo: {tier.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="second-floor"
+            checked={hasSecondFloor}
+            onCheckedChange={handleToggleSecondFloor}
+          />
+          <Label htmlFor="second-floor">Segundo piso</Label>
+        </div>
       </div>
-      
+
+      {isMultiSelectMode && selectedSeats.length > 0 && (
+        <div className="flex items-center gap-2 bg-muted p-2 rounded-md">
+          <span className="text-sm">
+            {selectedSeats.length} asiento(s) seleccionado(s)
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkAction("empty")}
+          >
+            Marcar como espacio
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleBulkAction("fill")}
+          >
+            Marcar como asiento
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                Asignar Tier <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {seatTiers.map((tier) => (
+                <DropdownMenuItem
+                  key={tier.id}
+                  onClick={() => handleBulkAction("tier", tier.id)}
+                >
+                  {tier.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedSeats([])}
+          >
+            Limpiar selección
+          </Button>
+        </div>
+      )}
+
       <Tabs defaultValue="firstFloor">
         <TabsList className="mb-4">
           <TabsTrigger value="firstFloor">Primer Piso</TabsTrigger>
@@ -460,25 +490,22 @@ export function SeatMatrixEditor({
             <TabsTrigger value="secondFloor">Segundo Piso</TabsTrigger>
           )}
         </TabsList>
-        
         <TabsContent value="firstFloor">
           {renderFloor("firstFloor", "Primer Piso")}
         </TabsContent>
-        
         {hasSecondFloor && (
           <TabsContent value="secondFloor">
             {renderFloor("secondFloor", "Segundo Piso")}
           </TabsContent>
         )}
       </Tabs>
-      
+
       {selectedSeat && (
         <EditSeatDialog
-          open={!!selectedSeat}
-          onOpenChange={() => setSelectedSeat(null)}
           seat={selectedSeat}
           seatTiers={seatTiers}
           onUpdate={handleUpdateSeat}
+          onClose={() => setSelectedSeat(null)}
         />
       )}
     </div>
