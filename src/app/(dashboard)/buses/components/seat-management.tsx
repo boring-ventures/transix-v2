@@ -24,7 +24,19 @@ import { Switch } from "@/components/ui/switch";
 import type { Bus } from "@/hooks/use-buses";
 import type { BusSeat } from "@/hooks/use-bus-seats";
 import type { SeatTier } from "@/hooks/use-seat-tiers";
-import type { SeatMatrix } from "@/hooks/use-bus-templates";
+import type { SeatPosition } from "@/hooks/use-bus-templates";
+
+// Define SeatMatrix locally instead of importing it
+interface SeatMatrix {
+  firstFloor: {
+    dimensions: { rows: number; seatsPerRow: number };
+    seats: SeatPosition[];
+  };
+  secondFloor?: {
+    dimensions: { rows: number; seatsPerRow: number };
+    seats: SeatPosition[];
+  };
+}
 
 // Update this interface for the seat in the matrix
 interface SeatMatrixSeat {

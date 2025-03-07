@@ -89,6 +89,20 @@ export enum BusType {
   DOUBLE_DECKER = "double_decker"
 }
 
+/**
+ * Represents the seat matrix used in the bus management components
+ */
+export interface SeatMatrix {
+  firstFloor: {
+    dimensions: { rows: number; seatsPerRow: number };
+    seats: SeatPosition[];
+  };
+  secondFloor?: {
+    dimensions: { rows: number; seatsPerRow: number };
+    seats: SeatPosition[];
+  };
+}
+
 export function useBusTemplates(companyId?: string, fetchInactive = false) {
   const queryClient = useQueryClient();
 

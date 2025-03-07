@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
-import { getProfileIdFromUserId } from "@/lib/auth-utils";
-
+import type { Prisma } from "@prisma/client";
 // Create a new schedule
 export async function GET(req: Request) {
   try {
@@ -24,7 +22,7 @@ export async function GET(req: Request) {
     const includes = includeParam.split(",");
 
     // Build the include object for Prisma
-    const includeObj: any = {};
+    const includeObj: Prisma.ScheduleInclude = {};
 
     if (includes.includes("bus")) includeObj.bus = true;
     if (includes.includes("primaryDriver")) includeObj.primaryDriver = true;
@@ -38,18 +36,22 @@ export async function GET(req: Request) {
     }
     if (includes.includes("tickets")) {
       includeObj._count = {
-        ...(includeObj._count || {}),
+        ...(typeof includeObj._count === "object" ? includeObj._count : {}),
         select: {
-          ...(includeObj._count?.select || {}),
+          ...(typeof includeObj._count === "object" && includeObj._count?.select
+            ? includeObj._count.select
+            : {}),
           tickets: true,
         },
       };
     }
     if (includes.includes("parcels")) {
       includeObj._count = {
-        ...(includeObj._count || {}),
+        ...(typeof includeObj._count === "object" ? includeObj._count : {}),
         select: {
-          ...(includeObj._count?.select || {}),
+          ...(typeof includeObj._count === "object" && includeObj._count?.select
+            ? includeObj._count.select
+            : {}),
           parcels: true,
         },
       };
@@ -78,31 +80,19 @@ export async function GET(req: Request) {
         ...(includeObj.secondaryDriver && { secondaryDriver: null }),
         ...(includeObj.routeSchedule && {
           routeSchedule: {
-            id: "",
-            routeId: "",
-            departureTime: new Date().toISOString(),
-            operatingDays: "",
-            active: true,
-            seasonStart: null,
-            seasonEnd: null,
-            estimatedArrivalTime: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            route: {
-              id: "",
-              name: "",
-              originId: "",
-              destinationId: "",
-              estimatedDuration: 0,
-              active: true,
-              departureLane: "",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            },
+            route: null,
           },
         }),
-        ...(includeObj._count?.select?.tickets && { _count: { tickets: 0 } }),
-        ...(includeObj._count?.select?.parcels && { _count: { parcels: 0 } }),
+        ...(typeof includeObj._count === "object" &&
+          includeObj._count !== null &&
+          typeof includeObj._count.select === "object" &&
+          includeObj._count.select !== null &&
+          includeObj._count.select.tickets && { _count: { tickets: 0 } }),
+        ...(typeof includeObj._count === "object" &&
+          includeObj._count !== null &&
+          typeof includeObj._count.select === "object" &&
+          includeObj._count.select !== null &&
+          includeObj._count.select.parcels && { _count: { parcels: 0 } }),
       },
     });
   } catch (error) {
@@ -112,12 +102,4 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
-
-// POST method is not needed here as it's handled by the main /api/schedules endpoint
-export async function POST(req: Request) {
-  return NextResponse.json(
-    { error: "Use the main /api/schedules endpoint for creating schedules" },
-    { status: 405 }
-  );
 }

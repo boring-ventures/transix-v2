@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import type { ScheduleStatus } from "@prisma/client";
 import { getProfileIdFromUserId } from "@/lib/auth-utils";
 
 // Update the status of a schedule
