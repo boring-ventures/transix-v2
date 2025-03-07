@@ -4,12 +4,6 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
@@ -295,52 +289,92 @@ export function SeatsStep({
     updateFormData({ passengers: updatedPassengers });
   };
 
-  // Handle customer creation
-  const handleCreateCustomer = async (passengerIndex: number) => {
-    const passenger = formData.passengers[passengerIndex];
+  // Add a function to create customers for all passengers without a customerId
+  const createMissingCustomers = async () => {
+    const passengersWithoutCustomerId = formData.passengers.filter(
+      (passenger) =>
+        !passenger.customerId && passenger.fullName && passenger.documentId
+    );
 
-    if (!passenger.fullName || !passenger.documentId) {
-      toast({
-        title: "Missing information",
-        description: "Please provide full name and document ID",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (passengersWithoutCustomerId.length === 0) return;
 
     try {
-      const customer = await createCustomer({
-        fullName: passenger.fullName,
-        documentId: passenger.documentId,
-        phone: passenger.phone,
-        email: passenger.email,
+      const createdCustomers = await Promise.all(
+        passengersWithoutCustomerId.map(async (passenger, idx) => {
+          try {
+            const customer = await createCustomer({
+              fullName: passenger.fullName,
+              documentId: passenger.documentId,
+              phone: passenger.phone,
+              email: passenger.email,
+            });
+            return {
+              passenger,
+              customer,
+              index: formData.passengers.findIndex(
+                (p) => p.seatNumber === passenger.seatNumber
+              ),
+            };
+          } catch (err) {
+            console.error(`Error creating customer for passenger ${idx}:`, err);
+            return null;
+          }
+        })
+      );
+
+      // Update passengers with created customers
+      const updatedPassengers = [...formData.passengers];
+      createdCustomers.forEach((result) => {
+        if (result && result.customer) {
+          updatedPassengers[result.index] = {
+            ...updatedPassengers[result.index],
+            customerId: result.customer.id,
+            customer: result.customer,
+          };
+        }
       });
 
-      if (customer) {
-        // Update passenger with customer ID
-        const updatedPassengers = [...formData.passengers];
-        updatedPassengers[passengerIndex] = {
-          ...updatedPassengers[passengerIndex],
-          customerId: customer.id,
-          customer: customer,
-        };
+      updateFormData({ passengers: updatedPassengers });
 
-        updateFormData({ passengers: updatedPassengers });
-
+      const createdCount = createdCustomers.filter(Boolean).length;
+      if (createdCount > 0) {
         toast({
-          title: "Success",
-          description: "Customer created and linked to ticket",
+          title: "Clientes registrados",
+          description: `Se han registrado ${createdCount} nuevos clientes`,
         });
       }
     } catch (err) {
-      console.error("Error creating customer:", err);
+      console.error("Error creating customers:", err);
       toast({
         title: "Error",
-        description: "Failed to create customer",
+        description: "Error al registrar clientes",
         variant: "destructive",
       });
     }
   };
+
+  // Make the function available to the parent component
+  useEffect(() => {
+    // Use a custom event to communicate with the parent component
+    const customEvent = new CustomEvent("registerMissingCustomers", {
+      detail: { createMissingCustomers },
+    });
+    document.dispatchEvent(customEvent);
+
+    // Add listener for when the parent wants to create customers
+    const handleCreateCustomers = () => {
+      createMissingCustomers();
+    };
+
+    document.addEventListener("createMissingCustomers", handleCreateCustomers);
+
+    return () => {
+      document.removeEventListener(
+        "createMissingCustomers",
+        handleCreateCustomers
+      );
+    };
+  }, []);
 
   // Show loading state
   if (isLoadingSchedule || isLoadingAvailability) {
@@ -544,7 +578,7 @@ export function SeatsStep({
               )}
               {!isAvailable && seatInfo.isBooked && (
                 <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs px-1 rounded-full">
-                  Reservado
+                  Ocupado
                 </span>
               )}
               {!isAvailable && !seatInfo.isBooked && (
@@ -722,20 +756,22 @@ export function SeatsStep({
               </p>
             </div>
           ) : (
-            <Accordion
-              type="single"
-              collapsible
-              value={expandedPassenger || undefined}
-              onValueChange={(value) => setExpandedPassenger(value)}
-              className="space-y-4"
-            >
+            <div className="space-y-4">
               {formData.passengers.map((passenger, index) => (
-                <AccordionItem
+                <div
                   key={passenger.seatNumber}
-                  value={passenger.seatNumber}
                   className="border rounded-lg shadow-sm overflow-hidden"
                 >
-                  <AccordionTrigger className="px-4 py-3 hover:bg-muted/50">
+                  <div
+                    className="px-4 py-3 hover:bg-muted/50 cursor-pointer flex items-center justify-between"
+                    onClick={() => {
+                      if (expandedPassenger === passenger.seatNumber) {
+                        setExpandedPassenger(null);
+                      } else {
+                        setExpandedPassenger(passenger.seatNumber);
+                      }
+                    }}
+                  >
                     <div className="flex items-center">
                       <span className="font-medium mr-2 text-primary">
                         Asiento {passenger.seatNumber}
@@ -748,8 +784,34 @@ export function SeatsStep({
                         </span>
                       )}
                     </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
+                    <div
+                      className="transform transition-transform duration-200"
+                      style={{
+                        transform:
+                          expandedPassenger === passenger.seatNumber
+                            ? "rotate(180deg)"
+                            : "rotate(0deg)",
+                      }}
+                    >
+                      <svg
+                        width="12"
+                        height="8"
+                        viewBox="0 0 12 8"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M1 1.5L6 6.5L11 1.5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {expandedPassenger === passenger.seatNumber && (
                     <div className="space-y-6 p-4 bg-card text-card-foreground">
                       {/* Document ID with search */}
                       <div className="space-y-3">
@@ -757,7 +819,7 @@ export function SeatsStep({
                           htmlFor={`passenger-${index}-document`}
                           className="text-base font-medium"
                         >
-                          Document ID
+                          Documento de Identidad
                         </Label>
                         <div className="relative">
                           <Input
@@ -776,7 +838,7 @@ export function SeatsStep({
                               // Trigger debounced search
                               debouncedSearch(documentId, index);
                             }}
-                            placeholder="Enter document ID to search"
+                            placeholder="Ingrese documento para buscar"
                             className="h-12 text-base px-4"
                           />
                           {isSearching[index] && (
@@ -818,7 +880,7 @@ export function SeatsStep({
                         <div className="bg-primary/5 p-4 rounded-lg space-y-3 border border-primary/20">
                           <div className="flex justify-between items-center">
                             <h4 className="font-medium text-primary">
-                              Customer Information
+                              Información del Cliente
                             </h4>
                             <Button
                               type="button"
@@ -826,13 +888,13 @@ export function SeatsStep({
                               size="sm"
                               onClick={() => clearSelectedCustomer(index)}
                             >
-                              <X className="h-4 w-4 mr-1" /> Clear
+                              <X className="h-4 w-4 mr-1" /> Limpiar
                             </Button>
                           </div>
                           <div className="grid grid-cols-1 gap-3">
                             <div>
                               <p className="text-sm text-muted-foreground">
-                                Full Name
+                                Nombre Completo
                               </p>
                               <p className="font-medium">
                                 {passenger.fullName}
@@ -840,14 +902,14 @@ export function SeatsStep({
                             </div>
                             <div>
                               <p className="text-sm text-muted-foreground">
-                                Document ID
+                                Documento de Identidad
                               </p>
                               <p>{passenger.documentId}</p>
                             </div>
                             {passenger.phone && (
                               <div>
                                 <p className="text-sm text-muted-foreground">
-                                  Phone
+                                  Teléfono
                                 </p>
                                 <p>{passenger.phone}</p>
                               </div>
@@ -855,7 +917,7 @@ export function SeatsStep({
                             {passenger.email && (
                               <div>
                                 <p className="text-sm text-muted-foreground">
-                                  Email
+                                  Correo Electrónico
                                 </p>
                                 <p>{passenger.email}</p>
                               </div>
@@ -870,7 +932,7 @@ export function SeatsStep({
                               htmlFor={`passenger-${index}-name`}
                               className="text-base font-medium"
                             >
-                              Full Name
+                              Nombre Completo
                             </Label>
                             <Input
                               id={`passenger-${index}-name`}
@@ -885,7 +947,7 @@ export function SeatsStep({
                                   passengers: updatedPassengers,
                                 });
                               }}
-                              placeholder="Enter passenger's full name"
+                              placeholder="Ingrese nombre completo del pasajero"
                               className="h-12 text-base px-4"
                             />
                           </div>
@@ -897,7 +959,7 @@ export function SeatsStep({
                                 htmlFor={`passenger-${index}-phone`}
                                 className="text-base font-medium"
                               >
-                                Phone (optional)
+                                Teléfono (opcional)
                               </Label>
                               <Input
                                 id={`passenger-${index}-phone`}
@@ -912,7 +974,7 @@ export function SeatsStep({
                                     passengers: updatedPassengers,
                                   });
                                 }}
-                                placeholder="Phone number"
+                                placeholder="Número de teléfono"
                                 className="h-12 text-base px-4"
                               />
                             </div>
@@ -921,7 +983,7 @@ export function SeatsStep({
                                 htmlFor={`passenger-${index}-email`}
                                 className="text-base font-medium"
                               >
-                                Email (optional)
+                                Correo Electrónico (opcional)
                               </Label>
                               <Input
                                 id={`passenger-${index}-email`}
@@ -936,28 +998,18 @@ export function SeatsStep({
                                     passengers: updatedPassengers,
                                   });
                                 }}
-                                placeholder="Email address"
+                                placeholder="Dirección de correo"
                                 className="h-12 text-base px-4"
                               />
                             </div>
                           </div>
-
-                          {/* Register as customer button */}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleCreateCustomer(index)}
-                            className="mt-2 w-full h-12 text-base"
-                          >
-                            Register as Customer
-                          </Button>
                         </>
                       )}
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
+                  )}
+                </div>
               ))}
-            </Accordion>
+            </div>
           )}
         </div>
       </div>
