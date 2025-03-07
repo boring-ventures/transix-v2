@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
-import { Users } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Users, User, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Accordion,
   AccordionContent,
@@ -13,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
 import type { Schedule, ScheduleAvailability } from "@/hooks/use-schedules";
+import { useCustomers } from "@/hooks/use-customers";
+import type { Customer } from "@/hooks/use-customers";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
 
@@ -100,9 +103,26 @@ export function SeatsStep({
   const [activeFloor, setActiveFloor] = useState<"firstFloor" | "secondFloor">(
     "firstFloor"
   );
+  const [searchResults, setSearchResults] = useState<
+    Record<number, Customer[]>
+  >({});
+  const [isSearching, setIsSearching] = useState<Record<number, boolean>>({});
+  const searchTimeoutRef = useRef<Record<number, NodeJS.Timeout>>({});
 
   // Fetch data from API
   const { locations } = useLocations();
+
+  // Add customer search and creation functionality
+  const { fetchCustomers, createCustomer } = useCustomers();
+
+  // Clean up timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(searchTimeoutRef.current).forEach((timeout) => {
+        clearTimeout(timeout);
+      });
+    };
+  }, []);
 
   // Fetch the selected schedule and its availability
   useEffect(() => {
@@ -203,6 +223,124 @@ export function SeatsStep({
   const destinationName = locations.find(
     (l: LocationWithId) => l.id === formData.destinationId
   )?.name;
+
+  // Handle customer search by document ID with debounce
+  const handleCustomerSearch = async (
+    documentId: string,
+    passengerIndex: number
+  ) => {
+    if (!documentId || documentId.length < 3) {
+      setSearchResults({ ...searchResults, [passengerIndex]: [] });
+      return;
+    }
+
+    setIsSearching({ ...isSearching, [passengerIndex]: true });
+
+    try {
+      const customers = await fetchCustomers({ documentId });
+      setSearchResults({ ...searchResults, [passengerIndex]: customers });
+    } catch (err) {
+      console.error("Error searching for customer:", err);
+      toast({
+        title: "Error",
+        description: "Failed to search for customer",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearching({ ...isSearching, [passengerIndex]: false });
+    }
+  };
+
+  // Debounced search function
+  const debouncedSearch = (documentId: string, passengerIndex: number) => {
+    // Clear any existing timeout for this passenger
+    if (searchTimeoutRef.current[passengerIndex]) {
+      clearTimeout(searchTimeoutRef.current[passengerIndex]);
+    }
+
+    // Set a new timeout
+    searchTimeoutRef.current[passengerIndex] = setTimeout(() => {
+      handleCustomerSearch(documentId, passengerIndex);
+    }, 300); // 300ms debounce time
+  };
+
+  // Select a customer from search results
+  const selectCustomer = (customer: Customer, passengerIndex: number) => {
+    const updatedPassengers = [...formData.passengers];
+    updatedPassengers[passengerIndex] = {
+      ...updatedPassengers[passengerIndex],
+      fullName: customer.fullName,
+      customerId: customer.id,
+      customer: customer,
+      phone: customer.phone || "",
+      email: customer.email || "",
+    };
+
+    updateFormData({ passengers: updatedPassengers });
+    setSearchResults({ ...searchResults, [passengerIndex]: [] });
+  };
+
+  // Clear selected customer
+  const clearSelectedCustomer = (passengerIndex: number) => {
+    const updatedPassengers = [...formData.passengers];
+    updatedPassengers[passengerIndex] = {
+      ...updatedPassengers[passengerIndex],
+      fullName: "",
+      customerId: undefined,
+      customer: undefined,
+      phone: "",
+      email: "",
+    };
+
+    updateFormData({ passengers: updatedPassengers });
+  };
+
+  // Handle customer creation
+  const handleCreateCustomer = async (passengerIndex: number) => {
+    const passenger = formData.passengers[passengerIndex];
+
+    if (!passenger.fullName || !passenger.documentId) {
+      toast({
+        title: "Missing information",
+        description: "Please provide full name and document ID",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const customer = await createCustomer({
+        fullName: passenger.fullName,
+        documentId: passenger.documentId,
+        phone: passenger.phone,
+        email: passenger.email,
+      });
+
+      if (customer) {
+        // Update passenger with customer ID
+        const updatedPassengers = [...formData.passengers];
+        updatedPassengers[passengerIndex] = {
+          ...updatedPassengers[passengerIndex],
+          customerId: customer.id,
+          customer: customer,
+        };
+
+        updateFormData({ passengers: updatedPassengers });
+
+        toast({
+          title: "Success",
+          description: "Customer created and linked to ticket",
+        });
+      }
+    } catch (err) {
+      console.error("Error creating customer:", err);
+      toast({
+        title: "Error",
+        description: "Failed to create customer",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Show loading state
   if (isLoadingSchedule || isLoadingAvailability) {
@@ -313,7 +451,7 @@ export function SeatsStep({
           className={cn(
             "w-full p-3 border rounded-md flex flex-col items-center justify-center transition-colors",
             seat.isEmpty
-              ? "bg-transparent border-dashed border-gray-300"
+              ? "bg-transparent border-dashed border-border"
               : isSelected
                 ? "bg-primary text-primary-foreground border-primary"
                 : isAvailable
@@ -405,12 +543,12 @@ export function SeatsStep({
                 </>
               )}
               {!isAvailable && seatInfo.isBooked && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1 rounded-full">
+                <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-xs px-1 rounded-full">
                   Reservado
                 </span>
               )}
               {!isAvailable && !seatInfo.isBooked && (
-                <span className="absolute -top-2 -right-2 bg-gray-500 text-white text-xs px-1 rounded-full">
+                <span className="absolute -top-2 -right-2 bg-muted-foreground text-background text-xs px-1 rounded-full">
                   Mantenimiento
                 </span>
               )}
@@ -490,8 +628,8 @@ export function SeatsStep({
 
       {/* Show toggle for all seats if no available seats */}
       {availableSeats.length === 0 && allSeats.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-4">
-          <p className="text-yellow-800 mb-2">
+        <div className="bg-muted/20 border border-border p-4 rounded-md mb-4">
+          <p className="text-foreground mb-2">
             No hay asientos disponibles para este viaje.
           </p>
           <div className="flex items-center">
@@ -502,7 +640,7 @@ export function SeatsStep({
               onChange={() => setShowAllSeats(!showAllSeats)}
               className="mr-2"
             />
-            <label htmlFor="show-all-seats" className="text-sm text-yellow-800">
+            <label htmlFor="show-all-seats" className="text-sm text-foreground">
               Mostrar todos los asientos (incluyendo no disponibles)
             </label>
           </div>
@@ -544,14 +682,14 @@ export function SeatsStep({
             renderSeatMatrix("firstFloor")
           )}
 
-          <div className="flex items-center justify-between mt-6 pt-4 border-t">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-sm bg-primary" />
                 <span className="text-sm">Seleccionado</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-sm border" />
+                <div className="w-4 h-4 rounded-sm border border-border" />
                 <span className="text-sm">Disponible</span>
               </div>
               <div className="flex items-center gap-2">
@@ -559,7 +697,7 @@ export function SeatsStep({
                 <span className="text-sm">No disponible</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-sm border border-dashed border-gray-300" />
+                <div className="w-4 h-4 rounded-sm border border-dashed border-border" />
                 <span className="text-sm">Espacio vacío</span>
               </div>
             </div>
@@ -589,65 +727,232 @@ export function SeatsStep({
               collapsible
               value={expandedPassenger || undefined}
               onValueChange={(value) => setExpandedPassenger(value)}
+              className="space-y-4"
             >
               {formData.passengers.map((passenger, index) => (
                 <AccordionItem
                   key={passenger.seatNumber}
                   value={passenger.seatNumber}
+                  className="border rounded-lg shadow-sm overflow-hidden"
                 >
-                  <AccordionTrigger>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-muted/50">
                     <div className="flex items-center">
-                      <span className="font-medium mr-2">
+                      <span className="font-medium mr-2 text-primary">
                         Asiento {passenger.seatNumber}
                       </span>
                       {passenger.fullName ? (
-                        <span className="text-sm text-muted-foreground">
-                          {passenger.fullName}
-                        </span>
+                        <span className="text-sm">{passenger.fullName}</span>
                       ) : (
-                        <span className="text-sm text-red-500">
+                        <span className="text-sm text-destructive">
                           Datos pendientes
                         </span>
                       )}
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor={`fullName-${index}`}>
-                          Nombre completo
+                    <div className="space-y-6 p-4 bg-card text-card-foreground">
+                      {/* Document ID with search */}
+                      <div className="space-y-3">
+                        <Label
+                          htmlFor={`passenger-${index}-document`}
+                          className="text-base font-medium"
+                        >
+                          Document ID
                         </Label>
-                        <Input
-                          id={`fullName-${index}`}
-                          value={passenger.fullName}
-                          onChange={(e) => {
-                            const updatedPassengers = [...formData.passengers];
-                            updatedPassengers[index].fullName = e.target.value;
-                            updateFormData({
-                              passengers: updatedPassengers,
-                            });
-                          }}
-                          placeholder="Nombre completo del pasajero"
-                        />
+                        <div className="relative">
+                          <Input
+                            id={`passenger-${index}-document`}
+                            value={passenger.documentId || ""}
+                            onChange={(e) => {
+                              const documentId = e.target.value;
+                              const updatedPassengers = [
+                                ...formData.passengers,
+                              ];
+                              updatedPassengers[index].documentId = documentId;
+                              updateFormData({
+                                passengers: updatedPassengers,
+                              });
+
+                              // Trigger debounced search
+                              debouncedSearch(documentId, index);
+                            }}
+                            placeholder="Enter document ID to search"
+                            className="h-12 text-base px-4"
+                          />
+                          {isSearching[index] && (
+                            <div className="absolute right-3 top-3">
+                              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                            </div>
+                          )}
+
+                          {/* Search results dropdown */}
+                          {searchResults[index]?.length > 0 && (
+                            <div className="absolute z-10 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                              {searchResults[index].map((customer) => (
+                                <div
+                                  key={customer.id}
+                                  className="p-3 hover:bg-muted cursor-pointer flex items-center gap-2 border-b border-border last:border-0"
+                                  onClick={() =>
+                                    selectCustomer(customer, index)
+                                  }
+                                >
+                                  <User className="h-5 w-5 text-muted-foreground" />
+                                  <div>
+                                    <p className="font-medium">
+                                      {customer.fullName}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {customer.documentId}
+                                      {customer.phone && ` • ${customer.phone}`}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <Label htmlFor={`documentId-${index}`}>
-                          Número de documento
-                        </Label>
-                        <Input
-                          id={`documentId-${index}`}
-                          value={passenger.documentId}
-                          onChange={(e) => {
-                            const updatedPassengers = [...formData.passengers];
-                            updatedPassengers[index].documentId =
-                              e.target.value;
-                            updateFormData({
-                              passengers: updatedPassengers,
-                            });
-                          }}
-                          placeholder="Número de documento"
-                        />
-                      </div>
+
+                      {/* Show customer info if selected */}
+                      {passenger.customerId ? (
+                        <div className="bg-primary/5 p-4 rounded-lg space-y-3 border border-primary/20">
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-medium text-primary">
+                              Customer Information
+                            </h4>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => clearSelectedCustomer(index)}
+                            >
+                              <X className="h-4 w-4 mr-1" /> Clear
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3">
+                            <div>
+                              <p className="text-sm text-muted-foreground">
+                                Full Name
+                              </p>
+                              <p className="font-medium">
+                                {passenger.fullName}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">
+                                Document ID
+                              </p>
+                              <p>{passenger.documentId}</p>
+                            </div>
+                            {passenger.phone && (
+                              <div>
+                                <p className="text-sm text-muted-foreground">
+                                  Phone
+                                </p>
+                                <p>{passenger.phone}</p>
+                              </div>
+                            )}
+                            {passenger.email && (
+                              <div>
+                                <p className="text-sm text-muted-foreground">
+                                  Email
+                                </p>
+                                <p>{passenger.email}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Full Name */}
+                          <div className="space-y-3">
+                            <Label
+                              htmlFor={`passenger-${index}-name`}
+                              className="text-base font-medium"
+                            >
+                              Full Name
+                            </Label>
+                            <Input
+                              id={`passenger-${index}-name`}
+                              value={passenger.fullName || ""}
+                              onChange={(e) => {
+                                const updatedPassengers = [
+                                  ...formData.passengers,
+                                ];
+                                updatedPassengers[index].fullName =
+                                  e.target.value;
+                                updateFormData({
+                                  passengers: updatedPassengers,
+                                });
+                              }}
+                              placeholder="Enter passenger's full name"
+                              className="h-12 text-base px-4"
+                            />
+                          </div>
+
+                          {/* Phone and Email */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <Label
+                                htmlFor={`passenger-${index}-phone`}
+                                className="text-base font-medium"
+                              >
+                                Phone (optional)
+                              </Label>
+                              <Input
+                                id={`passenger-${index}-phone`}
+                                value={passenger.phone || ""}
+                                onChange={(e) => {
+                                  const updatedPassengers = [
+                                    ...formData.passengers,
+                                  ];
+                                  updatedPassengers[index].phone =
+                                    e.target.value;
+                                  updateFormData({
+                                    passengers: updatedPassengers,
+                                  });
+                                }}
+                                placeholder="Phone number"
+                                className="h-12 text-base px-4"
+                              />
+                            </div>
+                            <div className="space-y-3">
+                              <Label
+                                htmlFor={`passenger-${index}-email`}
+                                className="text-base font-medium"
+                              >
+                                Email (optional)
+                              </Label>
+                              <Input
+                                id={`passenger-${index}-email`}
+                                value={passenger.email || ""}
+                                onChange={(e) => {
+                                  const updatedPassengers = [
+                                    ...formData.passengers,
+                                  ];
+                                  updatedPassengers[index].email =
+                                    e.target.value;
+                                  updateFormData({
+                                    passengers: updatedPassengers,
+                                  });
+                                }}
+                                placeholder="Email address"
+                                className="h-12 text-base px-4"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Register as customer button */}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleCreateCustomer(index)}
+                            className="mt-2 w-full h-12 text-base"
+                          >
+                            Register as Customer
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </AccordionContent>
                 </AccordionItem>

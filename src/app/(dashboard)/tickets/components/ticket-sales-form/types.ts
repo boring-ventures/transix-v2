@@ -3,6 +3,7 @@ import type { Location as ApiLocation } from "@/hooks/use-locations";
 import type { Route as ApiRoute } from "@/hooks/use-routes";
 import type { Schedule as ApiSchedule } from "@/hooks/use-schedules";
 import type { BusSeat as ApiBusSeat } from "@/hooks/use-bus-seats";
+import type { Customer as ApiCustomer } from "@/hooks/use-customers";
 
 // Form steps
 export type Step = "route" | "schedule" | "seats" | "review";
@@ -14,6 +15,8 @@ export interface FormData {
   scheduleId: string;
   selectedSeats: string[];
   passengers: Passenger[];
+  customerId?: string; // Main customer ID for the purchase
+  customer?: ApiCustomer; // Main customer data
 }
 
 export interface Passenger {
@@ -21,6 +24,10 @@ export interface Passenger {
   documentId: string;
   seatNumber: string;
   busSeatId?: string; // Added for API integration
+  customerId?: string; // Link to customer record
+  customer?: ApiCustomer; // Customer data
+  phone?: string; // Additional contact info
+  email?: string; // Additional contact info
 }
 
 // Location type (using API type)
@@ -37,6 +44,9 @@ export type Seat = ApiBusSeat & {
   isSelected?: boolean;
   isAvailable?: boolean;
 };
+
+// Customer type (using API type)
+export type Customer = ApiCustomer;
 
 // Step indicator props
 export interface StepIndicatorProps {

@@ -7,6 +7,10 @@ interface BulkTicketData {
   customerId?: string;
   price: number;
   notes?: string;
+  passengerName?: string;
+  passengerDocument?: string;
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 export function useBulkTickets() {

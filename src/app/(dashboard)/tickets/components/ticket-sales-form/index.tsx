@@ -77,43 +77,6 @@ export default function TicketSalesForm() {
           // Debug log to check passenger data
           console.log("Passenger data:", formData.passengers);
 
-          // Validate seat IDs - they should be UUIDs, not seat numbers
-          const invalidSeatIds = formData.passengers.filter((passenger) => {
-            // Check if busSeatId looks like a seat number (e.g., "1A") instead of a UUID
-            const isSeatNumber = /^[0-9]+[A-Za-z]$/.test(
-              passenger.busSeatId || ""
-            );
-
-            // A valid UUID should be a string of 36 characters with hyphens
-            // But we'll be more lenient here - just check if it's not a seat number pattern
-            return isSeatNumber;
-          });
-
-          if (invalidSeatIds.length > 0) {
-            console.error("Invalid seat IDs detected:", invalidSeatIds);
-            toast({
-              title: "Error",
-              description:
-                "Se detectaron IDs de asiento inválidos. Los IDs deben ser UUIDs, no números de asiento.",
-              variant: "destructive",
-            });
-            return;
-          }
-
-          // Ensure all passengers have valid busSeatId
-          const hasInvalidSeats = formData.passengers.some(
-            (passenger) => !passenger.busSeatId
-          );
-
-          if (hasInvalidSeats) {
-            toast({
-              title: "Error",
-              description: "Algunos asientos no tienen ID válido",
-              variant: "destructive",
-            });
-            return;
-          }
-
           // Filter out passengers with undefined busSeatId
           const validPassengers = formData.passengers.filter(
             (passenger) => passenger.busSeatId !== undefined
@@ -121,10 +84,14 @@ export default function TicketSalesForm() {
 
           const tickets = validPassengers.map((passenger) => ({
             scheduleId: formData.scheduleId,
-            busSeatId: passenger.busSeatId as string, // Type assertion to ensure it's a string
-            customerId: undefined, // Could be added if we have customer management
+            busSeatId: passenger.busSeatId as string,
+            customerId: passenger.customerId, // Include customer ID if available
             price: selectedSchedule.price,
             notes: `Pasajero: ${passenger.fullName}, Documento: ${passenger.documentId}`,
+            passengerName: passenger.fullName,
+            passengerDocument: passenger.documentId,
+            contactPhone: passenger.phone,
+            contactEmail: passenger.email,
           }));
 
           // Debug log to check ticket data being sent

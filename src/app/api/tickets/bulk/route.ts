@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     
     // Create all tickets in a transaction
     const createdTickets = await prisma.$transaction(
-      tickets.map(ticket => 
+      tickets.map((ticket) =>
         prisma.ticket.create({
           data: {
             scheduleId: ticket.scheduleId,
@@ -104,7 +104,9 @@ export async function POST(request: Request) {
             status: "active",
             price: ticket.price,
             purchasedBy,
-            notes: ticket.notes,
+            notes:
+              ticket.notes ||
+              `Passenger: ${ticket.passengerName || "Unknown"}, Document: ${ticket.passengerDocument || "Unknown"}`,
           },
         })
       )
