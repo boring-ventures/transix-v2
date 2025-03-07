@@ -19,6 +19,8 @@ export function useBulkTickets() {
       setError(null);
 
       try {
+        console.log("Creating bulk tickets:", { tickets, purchasedBy });
+
         const response = await fetch("/api/tickets/bulk", {
           method: "POST",
           headers: {
@@ -27,12 +29,16 @@ export function useBulkTickets() {
           body: JSON.stringify({ tickets, purchasedBy }),
         });
 
+        console.log("Bulk tickets response status:", response.status);
+        
         if (!response.ok) {
           const errorData = await response.json();
+          console.error("Bulk tickets error:", errorData);
           throw new Error(errorData.error || "Failed to create tickets");
         }
 
         const data = await response.json();
+        console.log("Bulk tickets success:", data);
         toast({
           title: "Tickets creados",
           description: `${data.tickets.length} tickets creados exitosamente`,

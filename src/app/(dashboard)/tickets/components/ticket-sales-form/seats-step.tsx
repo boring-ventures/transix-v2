@@ -294,17 +294,58 @@ export function SeatsStep({
               }
             } else {
               // Add seat and initialize passenger data
+              console.log("Adding seat:", seat);
+
+              // Log the full seat object to inspect its structure
+              console.log("Full seat object:", JSON.stringify(seat, null, 2));
+
+              // In the seat matrix, the seat.id is actually the seat number (e.g., "1A")
+              // We need to find the actual seat in allSeats to get the database UUID
+              let actualSeatId = seat.id;
+
+              // Check if the ID looks like a seat number
+              if (/^[0-9]+[A-Za-z]$/.test(seat.id)) {
+                console.log("Seat ID appears to be a seat number:", seat.id);
+
+                // Find the actual seat in allSeats by seat number
+                const actualSeat = allSeats.find(
+                  (s) => s.seatNumber === seat.id || s.name === seat.id
+                );
+
+                if (actualSeat) {
+                  console.log("Found actual seat:", actualSeat);
+                  actualSeatId = actualSeat.id;
+                } else {
+                  console.error(
+                    "Could not find actual seat with number:",
+                    seat.id
+                  );
+
+                  // As a fallback, try to find the seat in the processed seats array
+                  const processedSeat = seats.find(
+                    (s) => s.seatNumber === seat.id || s.name === seat.id
+                  );
+
+                  if (processedSeat) {
+                    console.log("Found processed seat:", processedSeat);
+                    actualSeatId = processedSeat.id;
+                  }
+                }
+              }
+              
               const newPassenger = {
                 fullName: "",
                 documentId: "",
-                seatNumber: seat.name,
-                busSeatId: seat.id,
+                seatNumber: seat.name || seat.seatNumber || seat.id, // This is the display name (e.g., "1A")
+                busSeatId: actualSeatId, // This should be the database UUID
               };
+
+              console.log("New passenger data:", newPassenger);
               updateFormData({
                 selectedSeats: [...formData.selectedSeats, seat.id],
                 passengers: [...formData.passengers, newPassenger],
               });
-              setExpandedPassenger(seat.name);
+              setExpandedPassenger(seat.name || seat.seatNumber || seat.id);
             }
           }}
         >

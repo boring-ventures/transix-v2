@@ -77,13 +77,56 @@ export default function TicketSalesForm() {
             return;
           }
 
+          // Debug log to check passenger data
+          console.log("Passenger data:", formData.passengers);
+
+          // Validate seat IDs - they should be UUIDs, not seat numbers
+          const invalidSeatIds = formData.passengers.filter((passenger) => {
+            // Check if busSeatId looks like a seat number (e.g., "1A") instead of a UUID
+            const isSeatNumber = /^[0-9]+[A-Za-z]$/.test(
+              passenger.busSeatId || ""
+            );
+
+            // A valid UUID should be a string of 36 characters with hyphens
+            // But we'll be more lenient here - just check if it's not a seat number pattern
+            return isSeatNumber;
+          });
+
+          if (invalidSeatIds.length > 0) {
+            console.error("Invalid seat IDs detected:", invalidSeatIds);
+            toast({
+              title: "Error",
+              description:
+                "Se detectaron IDs de asiento inválidos. Los IDs deben ser UUIDs, no números de asiento.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          // Ensure all passengers have valid busSeatId
+          const hasInvalidSeats = formData.passengers.some(
+            (passenger) => !passenger.busSeatId
+          );
+
+          if (hasInvalidSeats) {
+            toast({
+              title: "Error",
+              description: "Algunos asientos no tienen ID válido",
+              variant: "destructive",
+            });
+            return;
+          }
+
           const tickets = formData.passengers.map((passenger) => ({
             scheduleId: formData.scheduleId,
-            busSeatId: passenger.busSeatId || "",
+            busSeatId: passenger.busSeatId, // This should be the UUID, not the seat number
             customerId: undefined, // Could be added if we have customer management
             price: selectedSchedule.price,
             notes: `Pasajero: ${passenger.fullName}, Documento: ${passenger.documentId}`,
           }));
+
+          // Debug log to check ticket data being sent
+          console.log("Sending tickets:", tickets);
 
           await createBulkTickets(tickets);
 
