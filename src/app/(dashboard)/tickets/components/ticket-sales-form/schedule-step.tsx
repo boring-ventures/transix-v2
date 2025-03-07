@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
 import { useSchedules } from "@/hooks/use-schedules";
 import type { Schedule } from "@/hooks/use-schedules";
+import axios from "axios";
 
 export function ScheduleStep({
   formData,
@@ -14,6 +15,9 @@ export function ScheduleStep({
   formatTime,
 }: StepComponentProps) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [availableSeatsCount, setAvailableSeatsCount] = useState<
+    Record<string, number>
+  >({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +43,38 @@ export function ScheduleStep({
 
         console.log("Fetched schedules:", result);
         setSchedules(result || []);
+
+        // Fetch available seats count for each schedule
+        if (result && result.length > 0) {
+          const seatsCountPromises = result.map(async (schedule: Schedule) => {
+            try {
+              const response = await axios.get(
+                `/api/schedules/availability?scheduleId=${schedule.id}`
+              );
+              return {
+                scheduleId: schedule.id,
+                count: response.data.availableSeats?.length || 0,
+              };
+            } catch (err) {
+              console.error(
+                `Error fetching seats for schedule ${schedule.id}:`,
+                err
+              );
+              return { scheduleId: schedule.id, count: 0 };
+            }
+          });
+
+          const seatsCountResults = await Promise.all(seatsCountPromises);
+          const seatsCountMap = seatsCountResults.reduce(
+            (acc, { scheduleId, count }) => {
+              acc[scheduleId] = count;
+              return acc;
+            },
+            {} as Record<string, number>
+          );
+
+          setAvailableSeatsCount(seatsCountMap);
+        }
       } catch (err) {
         console.error("Error fetching schedules:", err);
         setError("Error al cargar los horarios disponibles");
@@ -114,7 +150,20 @@ export function ScheduleStep({
                   </div>
                   <div className="text-right">
                     <p className="font-medium">${schedule.price}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <div className="flex items-center justify-end gap-1 text-sm">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                      <span
+                        className={
+                          availableSeatsCount[schedule.id] === 0
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                        }
+                      >
+                        {availableSeatsCount[schedule.id] || 0} asientos
+                        disponibles
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
                       {Math.floor(
                         (new Date(schedule.estimatedArrivalTime).getTime() -
                           new Date(schedule.departureDate).getTime()) /

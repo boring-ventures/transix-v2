@@ -4,9 +4,10 @@ import type { Route as ApiRoute } from "@/hooks/use-routes";
 import type { Schedule as ApiSchedule } from "@/hooks/use-schedules";
 import type { BusSeat as ApiBusSeat } from "@/hooks/use-bus-seats";
 import type { Customer as ApiCustomer } from "@/hooks/use-customers";
+import type { Ticket as ApiTicket } from "@/hooks/use-tickets";
 
 // Form steps
-export type Step = "route" | "schedule" | "seats" | "review";
+export type Step = "route" | "schedule" | "seats" | "review" | "confirmation";
 
 // Form data structure
 export interface FormData {
@@ -47,6 +48,9 @@ export type Seat = ApiBusSeat & {
 
 // Customer type (using API type)
 export type Customer = ApiCustomer;
+
+// Ticket type (using API type)
+export type Ticket = ApiTicket;
 
 // Step indicator props
 export interface StepIndicatorProps {

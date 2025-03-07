@@ -223,7 +223,8 @@ export function SeatsStep({
     documentId: string,
     passengerIndex: number
   ) => {
-    if (!documentId || documentId.length < 3) {
+    // Allow searching with just 2 characters for better user experience
+    if (!documentId || documentId.length < 2) {
       setSearchResults({ ...searchResults, [passengerIndex]: [] });
       return;
     }
@@ -232,12 +233,13 @@ export function SeatsStep({
 
     try {
       const customers = await fetchCustomers({ documentId });
+      console.log(`Search results for "${documentId}":`, customers);
       setSearchResults({ ...searchResults, [passengerIndex]: customers });
     } catch (err) {
       console.error("Error searching for customer:", err);
       toast({
         title: "Error",
-        description: "Failed to search for customer",
+        description: "Error al buscar cliente",
         variant: "destructive",
       });
     } finally {
@@ -245,17 +247,17 @@ export function SeatsStep({
     }
   };
 
-  // Debounced search function
+  // Debounced search function with shorter delay
   const debouncedSearch = (documentId: string, passengerIndex: number) => {
     // Clear any existing timeout for this passenger
     if (searchTimeoutRef.current[passengerIndex]) {
       clearTimeout(searchTimeoutRef.current[passengerIndex]);
     }
 
-    // Set a new timeout
+    // Set a new timeout with shorter delay (200ms instead of 300ms)
     searchTimeoutRef.current[passengerIndex] = setTimeout(() => {
       handleCustomerSearch(documentId, passengerIndex);
-    }, 300); // 300ms debounce time
+    }, 200); // 200ms debounce time for more responsive search
   };
 
   // Select a customer from search results
@@ -669,6 +671,42 @@ export function SeatsStep({
     );
   };
 
+  // Handle document ID change
+  const handleDocumentIdChange = (
+    documentId: string,
+    passengerIndex: number
+  ) => {
+    const updatedPassengers = [...formData.passengers];
+    const currentPassenger = updatedPassengers[passengerIndex];
+
+    // If the passenger already has a customer ID and the document ID is being changed,
+    // clear the customer data to allow inputting new details
+    if (
+      currentPassenger.customerId &&
+      currentPassenger.documentId !== documentId
+    ) {
+      // Clear customer data but keep the new document ID
+      updatedPassengers[passengerIndex] = {
+        ...updatedPassengers[passengerIndex],
+        customerId: undefined,
+        customer: undefined,
+        documentId: documentId,
+      };
+
+      console.log("Cleared customer data due to document ID change");
+    } else {
+      // Just update the document ID
+      updatedPassengers[passengerIndex].documentId = documentId;
+    }
+
+    updateFormData({
+      passengers: updatedPassengers,
+    });
+
+    // Trigger debounced search
+    debouncedSearch(documentId, passengerIndex);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -760,7 +798,7 @@ export function SeatsStep({
         </div>
 
         {/* Right side: Passenger details and summary */}
-        <div>
+        <div className="md:w-full lg:w-[350px] xl:w-[400px]">
           <div className="bg-muted p-4 rounded-md mb-4">
             <h4 className="font-medium mb-2">Resumen de selección</h4>
             <p>Asientos seleccionados: {formData.selectedSeats.length}</p>
@@ -848,16 +886,7 @@ export function SeatsStep({
                             value={passenger.documentId || ""}
                             onChange={(e) => {
                               const documentId = e.target.value;
-                              const updatedPassengers = [
-                                ...formData.passengers,
-                              ];
-                              updatedPassengers[index].documentId = documentId;
-                              updateFormData({
-                                passengers: updatedPassengers,
-                              });
-
-                              // Trigger debounced search
-                              debouncedSearch(documentId, index);
+                              handleDocumentIdChange(documentId, index);
                             }}
                             placeholder="Ingrese documento para buscar"
                             className="h-12 text-base px-4"
@@ -874,21 +903,25 @@ export function SeatsStep({
                               {searchResults[index].map((customer) => (
                                 <div
                                   key={customer.id}
-                                  className="p-3 hover:bg-muted cursor-pointer flex items-center gap-2 border-b border-border last:border-0"
+                                  className="p-3 hover:bg-muted cursor-pointer flex items-center justify-between border-b border-border last:border-0"
                                   onClick={() =>
                                     selectCustomer(customer, index)
                                   }
                                 >
-                                  <User className="h-5 w-5 text-muted-foreground" />
-                                  <div>
-                                    <p className="font-medium">
-                                      {customer.fullName}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {customer.documentId}
-                                      {customer.phone && ` • ${customer.phone}`}
-                                    </p>
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <User className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                                    <div className="overflow-hidden">
+                                      <p className="font-medium truncate">
+                                        {customer.fullName}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground truncate">
+                                        Doc: {customer.documentId}
+                                      </p>
+                                    </div>
                                   </div>
+                                  <span className="text-primary text-xs whitespace-nowrap ml-2">
+                                    Seleccionar
+                                  </span>
                                 </div>
                               ))}
                             </div>

@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Clock, Users } from "lucide-react";
+import { MapPin, Clock, Users, CheckCircle, Ticket } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import type { FormData, Schedule, Step } from "./types";
+import type { FormData, Schedule, Step, Ticket as TicketType } from "./types";
 import { StepIndicator } from "./step-indicator";
 import { RouteStep } from "./route-step";
 import { ScheduleStep } from "./schedule-step";
 import { SeatsStep } from "./seats-step";
 import { ReviewStep } from "./review-step";
+import { ConfirmationStep } from "./confirmation-step";
 import { useLocations } from "@/hooks/use-locations";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useBulkTickets } from "@/hooks/use-bulk-tickets";
+import { cn } from "@/lib/utils";
 
 export default function TicketSalesForm() {
   const { toast } = useToast();
@@ -25,6 +27,7 @@ export default function TicketSalesForm() {
     selectedSeats: [],
     passengers: [],
   });
+  const [createdTickets, setCreatedTickets] = useState<TicketType[]>([]);
 
   // Fetch data using hooks
   const { isLoadingLocations } = useLocations();
@@ -76,6 +79,8 @@ export default function TicketSalesForm() {
 
           // Register any unregistered customers before creating tickets
           let updatedPassengers = [...formData.passengers];
+          let customerRegistrationAttempted = false;
+
           try {
             console.log("Attempting to register missing customers...");
             // Access the function from the window object in a way that avoids TypeScript errors
@@ -88,6 +93,7 @@ export default function TicketSalesForm() {
             if (
               typeof windowWithCustomFn.createMissingCustomers === "function"
             ) {
+              customerRegistrationAttempted = true;
               console.log(
                 "createMissingCustomers function found, calling it..."
               );
@@ -127,6 +133,7 @@ export default function TicketSalesForm() {
           );
 
           // Check if any passengers are missing customer IDs
+          // Only check passengers that have both fullName and documentId
           const passengersWithoutCustomerId = validPassengers.filter(
             (passenger) =>
               !passenger.customerId &&
@@ -134,7 +141,12 @@ export default function TicketSalesForm() {
               passenger.documentId
           );
 
-          if (passengersWithoutCustomerId.length > 0) {
+          // Only show warning if there are actually passengers missing customer IDs
+          // AND we attempted to create customers (to avoid false warnings)
+          if (
+            passengersWithoutCustomerId.length > 0 &&
+            customerRegistrationAttempted
+          ) {
             console.warn(
               "Some passengers still don't have customer IDs:",
               passengersWithoutCustomerId
@@ -162,22 +174,18 @@ export default function TicketSalesForm() {
           // Debug log to check ticket data being sent
           console.log("Sending tickets:", tickets);
 
-          await createBulkTickets(tickets);
+          const createdTickets = await createBulkTickets(tickets);
+
+          // Store created tickets in state for the confirmation step
+          setCreatedTickets(createdTickets || []);
+
+          // Move to confirmation step
+          setCurrentStep("confirmation");
 
           toast({
             title: "Compra completada",
             description: "Los boletos han sido comprados exitosamente",
           });
-
-          // Reset form
-          setFormData({
-            originId: "",
-            destinationId: "",
-            scheduleId: "",
-            selectedSeats: [],
-            passengers: [],
-          });
-          setCurrentStep("route");
         } catch (err) {
           console.error("Error creating tickets:", err);
           toast({
@@ -186,6 +194,18 @@ export default function TicketSalesForm() {
             variant: "destructive",
           });
         }
+        break;
+      case "confirmation":
+        // Reset form and go back to route step
+        setFormData({
+          originId: "",
+          destinationId: "",
+          scheduleId: "",
+          selectedSeats: [],
+          passengers: [],
+        });
+        setCreatedTickets([]);
+        setCurrentStep("route");
         break;
     }
   };
@@ -201,6 +221,10 @@ export default function TicketSalesForm() {
         break;
       case "review":
         setCurrentStep("seats");
+        break;
+      case "confirmation":
+        // Don't allow going back from confirmation
+        // as tickets have already been created
         break;
     }
   };
@@ -293,7 +317,12 @@ export default function TicketSalesForm() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div
+      className={cn(
+        "w-full mx-auto",
+        currentStep === "seats" ? "max-w-6xl" : "max-w-4xl"
+      )}
+    >
       {/* Steps indicator */}
       <div className="flex justify-between items-center mb-8">
         <StepIndicator
@@ -332,7 +361,13 @@ export default function TicketSalesForm() {
           icon={<Users className="h-5 w-5" />}
           active={currentStep === "seats"}
           completed={
-            currentStep === "review" && formData.selectedSeats.length > 0
+            !!(
+              currentStep === "review" &&
+              formData.selectedSeats.length > 0 &&
+              formData.passengers
+                .filter((p) => p.seatNumber)
+                .every((p) => p.fullName && p.documentId)
+            )
           }
           onClick={() => navigateToStep("seats")}
         />
@@ -340,10 +375,19 @@ export default function TicketSalesForm() {
         <StepIndicator
           label="Revisión"
           description="Confirme los detalles"
-          icon="R"
+          icon={<CheckCircle className="h-5 w-5" />}
           active={currentStep === "review"}
           completed={false}
           onClick={() => navigateToStep("review")}
+        />
+        <div className="h-px w-full max-w-12 bg-gray-200" />
+        <StepIndicator
+          label="Confirmación"
+          description="Venta completada"
+          icon={<Ticket className="h-5 w-5" />}
+          active={currentStep === "confirmation"}
+          completed={false}
+          onClick={() => {}}
         />
       </div>
 
@@ -354,43 +398,48 @@ export default function TicketSalesForm() {
           {currentStep === "schedule" && <ScheduleStep {...stepProps} />}
           {currentStep === "seats" && <SeatsStep {...stepProps} />}
           {currentStep === "review" && <ReviewStep {...stepProps} />}
+          {currentStep === "confirmation" && (
+            <ConfirmationStep {...stepProps} tickets={createdTickets} />
+          )}
         </CardContent>
       </Card>
 
       {/* Navigation buttons */}
-      <div className="flex justify-between mt-6">
-        <Button
-          variant="outline"
-          onClick={goToPreviousStep}
-          disabled={currentStep === "route"}
-        >
-          Atrás
-        </Button>
+      {currentStep !== "confirmation" && (
+        <div className="flex justify-between mt-6">
+          <Button
+            variant="outline"
+            onClick={goToPreviousStep}
+            disabled={currentStep === "route"}
+          >
+            Atrás
+          </Button>
 
-        {/* Step counter */}
-        <div className="text-center text-sm text-muted-foreground">
-          Paso{" "}
-          {currentStep === "route"
-            ? "1"
-            : currentStep === "schedule"
-              ? "2"
-              : currentStep === "seats"
-                ? "3"
-                : "4"}{" "}
-          de 4
+          {/* Step counter */}
+          <div className="text-center text-sm text-muted-foreground">
+            Paso{" "}
+            {currentStep === "route"
+              ? "1"
+              : currentStep === "schedule"
+                ? "2"
+                : currentStep === "seats"
+                  ? "3"
+                  : "4"}{" "}
+            de 4
+          </div>
+
+          <Button
+            onClick={goToNextStep}
+            disabled={!isStepValid() || isCreatingTickets}
+            className={isCreatingTickets ? "opacity-80" : ""}
+          >
+            {isCreatingTickets && (
+              <div className="mr-2 animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+            )}
+            {currentStep === "review" ? "Confirmar compra" : "Siguiente"}
+          </Button>
         </div>
-
-        <Button
-          onClick={goToNextStep}
-          disabled={!isStepValid() || isCreatingTickets}
-          className={isCreatingTickets ? "opacity-80" : ""}
-        >
-          {isCreatingTickets && (
-            <div className="mr-2 animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-          )}
-          {currentStep === "review" ? "Confirmar compra" : "Siguiente"}
-        </Button>
-      </div>
+      )}
     </div>
   );
 }

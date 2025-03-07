@@ -12,7 +12,15 @@ export async function GET(req: Request) {
 
     // Build the query
     const query: any = {};
-    if (documentId) query.documentId = documentId;
+
+    // Use contains for documentId to support partial matches
+    if (documentId) {
+      query.documentId = {
+        contains: documentId,
+        mode: "insensitive",
+      };
+    }
+
     if (email) query.email = email;
     if (phone) query.phone = phone;
     if (fullName) query.fullName = { contains: fullName, mode: "insensitive" };
