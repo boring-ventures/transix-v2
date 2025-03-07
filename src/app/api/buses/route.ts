@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma} from "@prisma/client";
-
 // Get all buses with optional filtering
 export async function GET(req: Request) {
   try {
@@ -88,12 +87,33 @@ export async function POST(req: Request) {
     // Parse the template's seat matrix
     const templateMatrix = JSON.parse(template.seatTemplateMatrix as string);
 
+    // Define the seat type
+    interface Seat {
+      id: string;
+      tierId: string;
+      isEmpty?: boolean;
+      row?: number;
+      column?: number;
+    }
+
+    // Define the seat matrix type
+    interface SeatMatrix {
+      firstFloor: {
+        dimensions: { rows: number; seatsPerRow: number };
+        seats: Seat[];
+      };
+      secondFloor?: {
+        dimensions: { rows: number; seatsPerRow: number };
+        seats: Seat[];
+      };
+    }
+
     // Create a new seat matrix for the bus, preserving the structure but ensuring
     // all seats have the correct floor property and are properly organized
-    const seatMatrix = {
+    const seatMatrix: SeatMatrix = {
       firstFloor: {
         dimensions: templateMatrix.firstFloor.dimensions,
-        seats: templateMatrix.firstFloor.seats.map((seat) => ({
+        seats: templateMatrix.firstFloor.seats.map((seat: Seat) => ({
           ...seat,
           floor: "first",
           status: "available", // Ensure all seats start as available
@@ -105,7 +125,7 @@ export async function POST(req: Request) {
     if (templateMatrix.secondFloor) {
       seatMatrix.secondFloor = {
         dimensions: templateMatrix.secondFloor.dimensions,
-        seats: templateMatrix.secondFloor.seats.map((seat) => ({
+        seats: templateMatrix.secondFloor.seats.map((seat: Seat) => ({
           ...seat,
           floor: "second",
           status: "available", // Ensure all seats start as available
@@ -153,8 +173,8 @@ export async function POST(req: Request) {
     // Process second floor seats if they exist
     if (seatMatrix.secondFloor && seatMatrix.secondFloor.seats) {
       const secondFloorSeats = seatMatrix.secondFloor.seats
-        .filter((seat) => !seat.isEmpty)
-        .map((seat) => ({
+        .filter((seat: Seat) => !seat.isEmpty)
+        .map((seat: Seat) => ({
           busId: bus.id,
           seatNumber: seat.id,
           tierId: seat.tierId,
@@ -171,7 +191,7 @@ export async function POST(req: Request) {
     // Create all bus seats in a single transaction
     if (allSeats.length > 0) {
       await prisma.busSeat.createMany({
-        data: allSeats,
+        data: allSeats as Prisma.BusSeatCreateManyInput[],
       });
     }
 
