@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/select";
 import type { StepComponentProps } from "./types";
 import { useLocations } from "@/hooks/use-locations";
-
+import type { Location } from "./types";
 export function RouteStep({ formData, updateFormData }: StepComponentProps) {
   // Fetch locations from API
   const { locations, isLoadingLocations } = useLocations();
@@ -22,7 +22,7 @@ export function RouteStep({ formData, updateFormData }: StepComponentProps) {
   }
 
   // Filter active locations
-  const activeLocations = locations.filter((location) => location.active);
+  const activeLocations = locations.filter((location: Location) => location.active);
 
   return (
     <div className="space-y-6">
@@ -42,7 +42,7 @@ export function RouteStep({ formData, updateFormData }: StepComponentProps) {
             <SelectValue placeholder="Seleccione origen" />
           </SelectTrigger>
           <SelectContent>
-            {activeLocations.map((location) => (
+            {activeLocations.map((location: Location) => (
               <SelectItem key={location.id} value={location.id}>
                 {location.name}
               </SelectItem>
@@ -63,8 +63,8 @@ export function RouteStep({ formData, updateFormData }: StepComponentProps) {
           </SelectTrigger>
           <SelectContent>
             {activeLocations
-              .filter((location) => location.id !== formData.originId)
-              .map((location) => (
+              .filter((location: Location) => location.id !== formData.originId)
+              .map((location: Location) => (
                 <SelectItem key={location.id} value={location.id}>
                   {location.name}
                 </SelectItem>
