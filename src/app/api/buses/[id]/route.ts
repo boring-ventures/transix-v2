@@ -4,10 +4,10 @@ import { prisma } from "@/lib/prisma";
 // Get a specific bus by ID
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const bus = await prisma.bus.findUnique({
       where: { id },
@@ -54,10 +54,10 @@ export async function GET(
 // Update a bus
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const json = await request.json();
     const { plateNumber, isActive, seatMatrix, maintenanceStatus, templateId } =
       json;
@@ -122,10 +122,10 @@ export async function PATCH(
 // Delete a bus
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Check if bus exists
     const existingBus = await prisma.bus.findUnique({
