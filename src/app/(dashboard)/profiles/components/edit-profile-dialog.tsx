@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useProfiles, type Profile, type ProfileFormData } from "@/hooks/use-profiles";
+import {
+  useProfiles,
+  type Profile,
+  type ProfileFormData,
+} from "@/hooks/use-profiles";
 import { useCompanies, type Company, type Branch } from "@/hooks/use-companies";
 import {
   Dialog,
@@ -56,7 +60,8 @@ export function EditProfileDialog({
   onOpenChange,
   profile,
 }: EditProfileDialogProps) {
-  const { updateProfile, isUpdating, assignCompany, isAssigningCompany } = useProfiles();
+  const { updateProfile, isUpdating, assignCompany, isAssigningCompany } =
+    useProfiles();
   const { companies, isLoadingCompanies } = useCompanies(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -91,7 +96,9 @@ export function EditProfileDialog({
       });
 
       if (profile.companyId) {
-        const company = companies.find((c: Company) => c.id === profile.companyId);
+        const company = companies.find(
+          (c: Company) => c.id === profile.companyId
+        );
         if (company) {
           setSelectedCompany(company);
         }
@@ -117,43 +124,55 @@ export function EditProfileDialog({
 
   const onSubmit = async (data: EditProfileFormValues) => {
     if (!profile) return;
-    
+
     setError(null);
+
+    // Validate data before submitting
+    if (data.role !== "superadmin" && !data.companyId) {
+      setError("Debe seleccionar una empresa para este rol");
+      return;
+    }
+
+    // Branch admin must have a branch
+    if (data.role === "branch_admin" && !data.branchId) {
+      setError(
+        "Debe seleccionar una sucursal para un administrador de sucursal"
+      );
+      return;
+    }
+
     try {
-      // If changing to superadmin, ensure company and branch are null
+      // Prepare update data based on role
+      const updateData: ProfileFormData = {
+        fullName: data.fullName,
+        email: data.email || undefined,
+        role: data.role,
+        active: data.active,
+      };
+
+      // Handle company and branch based on role
       if (data.role === "superadmin") {
-        data.companyId = undefined;
-        data.branchId = undefined;
+        // For superadmin, explicitly set company and branch to null
+        updateData.companyId = null;
+        updateData.branchId = null;
+      } else {
+        // For other roles, use the selected values
+        updateData.companyId = data.companyId || null;
+        updateData.branchId = data.branchId || null;
       }
-      
-      // First update the profile basic info
+
+      // Update the profile
       await updateProfile.mutateAsync({
         id: profile.userId,
-        data: {
-          fullName: data.fullName,
-          email: data.email,
-          role: data.role,
-          active: data.active,
-          // If user is now a superadmin, explicitly set company and branch to null
-          companyId: data.role === "superadmin" ? null : data.companyId,
-          branchId: data.role === "superadmin" ? null : data.branchId,
-        } as ProfileFormData,
+        data: updateData,
       });
-      
-      // Only handle company assignment for non-superadmin roles
-      if (data.role !== "superadmin" && 
-          (data.companyId !== profile.companyId || data.branchId !== profile.branchId)) {
-        await assignCompany.mutateAsync({
-          id: profile.userId,
-          companyId: data.companyId || "",
-          branchId: data.branchId || "",
-          role: data.role,
-        });
-      }
-      
+
       onOpenChange(false);
-    } catch {
-      setError("Error al actualizar el usuario. Por favor, inténtelo de nuevo.");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      setError(
+        "Error al actualizar el usuario. Por favor, inténtelo de nuevo."
+      );
     }
   };
 
@@ -176,10 +195,7 @@ export function EditProfileDialog({
                 <FormItem>
                   <FormLabel>Nombre Completo</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Nombre completo"
-                      {...field}
-                    />
+                    <Input placeholder="Nombre completo" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -222,8 +238,12 @@ export function EditProfileDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="superadmin">Super Admin</SelectItem>
-                      <SelectItem value="company_admin">Admin de Empresa</SelectItem>
-                      <SelectItem value="branch_admin">Admin de Sucursal</SelectItem>
+                      <SelectItem value="company_admin">
+                        Admin de Empresa
+                      </SelectItem>
+                      <SelectItem value="branch_admin">
+                        Admin de Sucursal
+                      </SelectItem>
                       <SelectItem value="seller">Vendedor</SelectItem>
                     </SelectContent>
                   </Select>
@@ -355,4 +375,4 @@ export function EditProfileDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}

@@ -1,11 +1,39 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { withRoleProtection } from "@/lib/api-auth";
 
-// Create a new company
-export async function POST(req: Request) {
+// Only superadmin can access companies API
+const getCompanies = async (request: Request) => {
   try {
-    const json = await req.json();
+    const { searchParams } = new URL(request.url);
+    const active = searchParams.get("active");
+
+    const companies = await prisma.company.findMany({
+      where: {
+        active: active ? active === "true" : undefined,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return NextResponse.json({ companies });
+  } catch (error) {
+    console.error("Error fetching companies:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+};
+
+// Apply role protection to the handler
+export const GET = withRoleProtection(getCompanies, ["superadmin"]);
+
+// POST is also protected - only superadmin can create companies
+const createCompany = async (request: Request) => {
+  try {
+    const json = await request.json();
     const { name, active } = json;
 
     if (!name) {
@@ -30,38 +58,7 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
-}
+};
 
-// Get all companies with optional filtering
-export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const name = searchParams.get("name");
-    const active = searchParams.get("active");
-    
-    const whereClause: Prisma.CompanyWhereInput = {};
-    
-    if (name) {
-      whereClause.name = { contains: name, mode: 'insensitive' };
-    }
-    
-    if (active !== null) {
-      whereClause.active = active === "true";
-    }
-    
-    const companies = await prisma.company.findMany({
-      where: whereClause,
-      orderBy: {
-        name: "asc",
-      },
-    });
-    
-    return NextResponse.json({ companies });
-  } catch (error) {
-    console.error("Error fetching companies:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-} 
+// Apply role protection to the handler
+export const POST = withRoleProtection(createCompany, ["superadmin"]);

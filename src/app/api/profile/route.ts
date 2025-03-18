@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withRoleProtection } from "@/lib/api-auth";
 import type { Role, Prisma } from "@prisma/client";
 
-export async function POST(req: Request) {
+const createProfile = async (req: Request) => {
   try {
     const json = await req.json();
-    const { fullName, email, userId, companyId, branchId, avatarUrl } = json;
+    const { fullName, email, userId, companyId, branchId, avatarUrl, role } =
+      json;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "User ID is required" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -20,54 +22,53 @@ export async function POST(req: Request) {
     });
 
     if (existingProfile) {
-      return new Response(JSON.stringify({ error: "Profile already exists for this user" }), {
-        status: 409,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({ error: "Profile already exists for this user" }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
-    // Create minimal profile first
+    // Create profile with provided role or default to seller
     const profile = await prisma.profile.create({
       data: {
         userId: userId,
-        role: "superadmin",
-        active: true
-      }
+        role: role || "seller", // Use the role from the request or default to "seller"
+        active: true,
+        fullName: fullName || null,
+        email: email || null,
+        companyId: companyId || null,
+        branchId: branchId || null,
+        avatarUrl: avatarUrl || null,
+      },
     });
-
-    // If successful, update with additional fields
-    if (profile) {
-      const updatedProfile = await prisma.profile.update({
-        where: { id: profile.id },
-        data: {
-          fullName: fullName || null,
-          email: email || null,
-          companyId: companyId || null,
-          branchId: branchId || null,
-          avatarUrl: avatarUrl || null,
-        }
-      });
-      
-      return new Response(JSON.stringify({ profile: updatedProfile }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
-    }
 
     return new Response(JSON.stringify({ profile }), {
       status: 200,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(JSON.stringify({ error: "Internal server error", details: errorMessage }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: errorMessage }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
-}
+};
 
-export async function GET(req: Request) {
+// Only superadmin and company_admin can create profiles
+export const POST = withRoleProtection(createProfile, [
+  "superadmin",
+  "company_admin",
+]);
+
+const getProfiles = async (req: Request) => {
   try {
     const { searchParams } = new URL(req.url);
     const companyId = searchParams.get("companyId");
@@ -101,4 +102,10 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
-}
+};
+
+// Only superadmin and company_admin can list profiles
+export const GET = withRoleProtection(getProfiles, [
+  "superadmin",
+  "company_admin",
+]);

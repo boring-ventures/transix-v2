@@ -1,25 +1,22 @@
-import type { Metadata } from "next";
-import TicketSalesForm from "../components/ticket-sales-form";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Venta de Tickets",
-  description: "Vender tickets para rutas programadas",
-};
+import { ConditionalUI } from "@/components/auth/ConditionalUI";
 
 export default function TicketSalesPage() {
   return (
-    <div className="container mx-auto py-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Venta de Tickets
-          </h1>
-          <p className="text-muted-foreground">
-            Complete el formulario para vender tickets
-          </p>
+    <ConditionalUI
+      allowedRoles={["superadmin", "company_admin", "branch_admin", "seller"]}
+    >
+      <div className="container mx-auto py-6">
+        <h1 className="text-2xl font-bold mb-6">Venta de Tickets</h1>
+
+        <div className="grid gap-6">
+          <div className="border rounded-lg p-6">
+            <h2 className="text-lg font-medium mb-4">Sistema de Venta</h2>
+            <p>Interfaz para la venta de tickets de viaje.</p>
+          </div>
         </div>
       </div>
-      <TicketSalesForm />
-    </div>
+    </ConditionalUI>
   );
 }

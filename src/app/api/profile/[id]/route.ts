@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase/server";
-import type { Role, Profile } from "@prisma/client";
+import { withRoleProtection } from "@/lib/api-auth";
+import type { Profile } from "@prisma/client";
 
 // Get a specific profile by ID
-export async function GET(
+const getProfile = async (
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  context: { params: { id: string } }
+) => {
   try {
     // Get the user ID from the route parameter
-    const { id } = await params;
+    const { id } = context.params;
 
     // First check if this is a userId (from Supabase) or a profile ID
     let profile: Profile | null = null;
@@ -58,15 +59,18 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+};
+
+// Allow all authenticated users to view profiles
+export const GET = getProfile;
 
 // Update a profile
-export async function PATCH(
+const updateProfile = async (
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  context: { params: { id: string } }
+) => {
   try {
-    const { id } = await params;
+    const { id } = context.params;
     const json = await req.json();
     const { fullName, email, role, companyId, branchId, active, avatarUrl } =
       json;
@@ -129,7 +133,7 @@ export async function PATCH(
       data: {
         fullName: fullName !== undefined ? fullName : undefined,
         email: email !== undefined ? email : undefined,
-        role: role !== undefined ? (role as Role) : undefined,
+        role: role !== undefined ? role : undefined,
         companyId: companyId !== undefined ? companyId : undefined,
         branchId: branchId !== undefined ? branchId : undefined,
         active: active !== undefined ? active : undefined,
@@ -148,15 +152,21 @@ export async function PATCH(
       { status: 500 }
     );
   }
-}
+};
+
+// Only superadmin and company_admin can update profiles
+export const PATCH = withRoleProtection(updateProfile, [
+  "superadmin",
+  "company_admin",
+]);
 
 // Delete a profile
-export async function DELETE(
+const deleteProfile = async (
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  context: { params: { id: string } }
+) => {
   try {
-    const { id } = await params;
+    const { id } = context.params;
 
     // Check if profile exists
     const existingProfile = await prisma.profile.findUnique({
@@ -186,4 +196,10 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+};
+
+// Only superadmin and company_admin can delete profiles
+export const DELETE = withRoleProtection(deleteProfile, [
+  "superadmin",
+  "company_admin",
+]);

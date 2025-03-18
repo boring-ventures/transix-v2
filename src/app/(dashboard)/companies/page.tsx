@@ -1,11 +1,16 @@
-import type { Metadata } from "next";
+"use client";
+
+import { ConditionalUI } from "@/components/auth/ConditionalUI";
 import CompaniesClient from "./companies-client";
 
-export const metadata: Metadata = {
-  title: "Empresas | Transix",
-  description: "Gestionar empresas de transporte",
-};
-
 export default function CompaniesPage() {
-  return <CompaniesClient />;
-} 
+  return (
+    <ConditionalUI
+      allowedRoles={["superadmin"]}
+      showAccessDenied={true}
+      message="Solo los administradores del sistema pueden gestionar empresas."
+    >
+      <CompaniesClient />
+    </ConditionalUI>
+  );
+}

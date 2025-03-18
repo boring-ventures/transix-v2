@@ -1,11 +1,18 @@
-import type { Metadata } from "next";
+"use client";
+
+import { ConditionalUI } from "@/components/auth/ConditionalUI";
 import ProfilesClient from "./profiles-client";
 
-export const metadata: Metadata = {
-  title: "Usuarios | Transix",
-  description: "Gestionar usuarios del sistema",
-};
-
 export default function ProfilesPage() {
-  return <ProfilesClient />;
-} 
+  return (
+    <ConditionalUI
+      allowedRoles={["superadmin", "company_admin"]}
+      showAccessDenied={true}
+      message="Solo los administradores pueden gestionar usuarios."
+      redirectUrl="/dashboard"
+      redirectText="Volver al Panel Principal"
+    >
+      <ProfilesClient />
+    </ConditionalUI>
+  );
+}

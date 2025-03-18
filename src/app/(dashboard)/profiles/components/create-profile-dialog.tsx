@@ -95,33 +95,46 @@ export function CreateProfileDialog({
 
   const onSubmit = async (data: CreateProfileFormValues) => {
     setError(null);
-    
-    if (!isSuperAdmin && !data.companyId) {
+
+    if (data.role !== "superadmin" && !data.companyId) {
       setError("Debe seleccionar una empresa para este rol");
       return;
     }
-    
+
+    if (data.role === "branch_admin" && !data.branchId) {
+      setError(
+        "Debe seleccionar una sucursal para un administrador de sucursal"
+      );
+      return;
+    }
+
     try {
-      const { success, user, error: signUpError } = await signUp(data.email, data.password);
-      
+      const {
+        success,
+        user,
+        error: signUpError,
+      } = await signUp(data.email, data.password);
+
       if (!success || !user) {
         setError(signUpError?.message || "Error al crear el usuario");
         return;
       }
-      
-      await createProfile.mutateAsync({
+
+      const profileData = {
         userId: user.id,
         fullName: data.fullName,
         email: data.email,
         role: data.role,
         active: data.active,
-        companyId: isSuperAdmin ? undefined : data.companyId,
-        branchId: isSuperAdmin ? undefined : data.branchId,
-      });
-      
+        companyId: data.role === "superadmin" ? null : data.companyId,
+        branchId: data.role === "superadmin" ? null : data.branchId,
+      };
+
+      await createProfile.mutateAsync(profileData);
+
       form.reset();
       onOpenChange(false);
-    } catch  {
+    } catch {
       setError("Error al crear el usuario. Por favor, inténtelo de nuevo.");
     }
   };
@@ -181,10 +194,7 @@ export function CreateProfileDialog({
                 <FormItem>
                   <FormLabel>Nombre Completo</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Nombre completo"
-                      {...field}
-                    />
+                    <Input placeholder="Nombre completo" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -208,8 +218,12 @@ export function CreateProfileDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="superadmin">Super Admin</SelectItem>
-                      <SelectItem value="company_admin">Admin de Empresa</SelectItem>
-                      <SelectItem value="branch_admin">Admin de Sucursal</SelectItem>
+                      <SelectItem value="company_admin">
+                        Admin de Empresa
+                      </SelectItem>
+                      <SelectItem value="branch_admin">
+                        Admin de Sucursal
+                      </SelectItem>
                       <SelectItem value="seller">Vendedor</SelectItem>
                     </SelectContent>
                   </Select>
@@ -340,4 +354,4 @@ export function CreateProfileDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}

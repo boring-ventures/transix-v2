@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withRoleProtection } from "@/lib/api-auth";
 
-export async function POST(
+const assignCompany = async (
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  context: { params: { id: string } }
+) => {
   try {
-    const { id } = await params;
+    const { id } = context.params;
     const { companyId, role, branchId } = await req.json();
 
     if (!companyId) {
@@ -22,10 +23,7 @@ export async function POST(
     });
 
     if (!profile) {
-      return NextResponse.json(
-        { error: "Profile not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
     // Check if company exists
@@ -34,10 +32,7 @@ export async function POST(
     });
 
     if (!company) {
-      return NextResponse.json(
-        { error: "Company not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
     // If branchId is provided, check if it exists and belongs to the company
@@ -45,14 +40,14 @@ export async function POST(
       const branch = await prisma.branch.findUnique({
         where: { id: branchId },
       });
-      
+
       if (!branch) {
         return NextResponse.json(
           { error: "Branch not found" },
           { status: 404 }
         );
       }
-      
+
       if (branch.companyId !== companyId) {
         return NextResponse.json(
           { error: "Branch does not belong to the specified company" },
@@ -82,4 +77,10 @@ export async function POST(
       { status: 500 }
     );
   }
-} 
+};
+
+// Only superadmin and company_admin can assign companies to profiles
+export const POST = withRoleProtection(assignCompany, [
+  "superadmin",
+  "company_admin",
+]);
