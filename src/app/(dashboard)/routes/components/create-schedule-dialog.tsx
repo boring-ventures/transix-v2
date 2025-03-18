@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSchedules, type ScheduleFormData } from "@/hooks/use-schedules";
 import { type Bus, useBuses } from "@/hooks/use-buses";
 import { type Driver, useDrivers } from "@/hooks/use-drivers";
-import { useRouteSchedules, type RouteSchedule } from "@/hooks/use-route-schedules";
+import {
+  useRouteSchedules,
+  type RouteSchedule,
+} from "@/hooks/use-route-schedules";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +42,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, addMinutes, isSameDay } from "date-fns";
+import { format, addMinutes, isSameDay, isAfter, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -76,6 +79,7 @@ export function CreateScheduleDialog({
   const { drivers, isLoadingDrivers } = useDrivers(true);
   const { routeSchedules, isLoadingRouteSchedules } = useRouteSchedules({
     routeId,
+    active: true,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -138,14 +142,26 @@ export function CreateScheduleDialog({
     }
   }, [routeSchedules, form]);
 
+  // Filter out expired route schedules
+  const validRouteSchedules = useMemo(() => {
+    const today = new Date();
+    return routeSchedules.filter((schedule: RouteSchedule) => {
+      // If there is no seasonEnd, keep the schedule
+      if (!schedule.seasonEnd) return true;
+      // Keep the schedule if seasonEnd is after today
+      return isAfter(parseISO(schedule.seasonEnd), today);
+    });
+  }, [routeSchedules]);
+
   const onSubmit = async (data: CreateScheduleFormValues) => {
     setError(null);
-    
+
     try {
       const scheduleData: ScheduleFormData = {
         routeId,
         busId: data.busId,
-        routeScheduleId: data.routeScheduleId === "none" ? undefined : data.routeScheduleId,
+        routeScheduleId:
+          data.routeScheduleId === "none" ? undefined : data.routeScheduleId,
         primaryDriverId: data.primaryDriverId,
         secondaryDriverId:
           data.secondaryDriverId === "none"
@@ -193,64 +209,72 @@ export function CreateScheduleDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">Ninguno</SelectItem>
-                      {routeSchedules.map((routeSchedule: RouteSchedule) => {
-                        // Format operating days for better display
-                        const daysMap = {
-                          "0": "Dom",
-                          "1": "Lun",
-                          "2": "Mar",
-                          "3": "Mié",
-                          "4": "Jue",
-                          "5": "Vie",
-                          "6": "Sáb",
-                        };
+                      {validRouteSchedules.map(
+                        (routeSchedule: RouteSchedule) => {
+                          // Format operating days for better display
+                          const daysMap = {
+                            "0": "Dom",
+                            "1": "Lun",
+                            "2": "Mar",
+                            "3": "Mié",
+                            "4": "Jue",
+                            "5": "Vie",
+                            "6": "Sáb",
+                          };
 
-                        const days = routeSchedule.operatingDays
-                          .split(",")
-                          .map((day) => daysMap[day as keyof typeof daysMap])
-                          .join(", ");
+                          const days = routeSchedule.operatingDays
+                            .split(",")
+                            .map((day) => daysMap[day as keyof typeof daysMap])
+                            .join(", ");
 
-                        // Format departure and arrival times
-                        const departureTime = format(
-                          new Date(routeSchedule.departureTime),
-                          "HH:mm"
-                        );
-                        const arrivalTime = format(
-                          new Date(routeSchedule.estimatedArrivalTime),
-                          "HH:mm"
-                        );
+                          // Format departure and arrival times
+                          const departureTime = format(
+                            new Date(routeSchedule.departureTime),
+                            "HH:mm"
+                          );
+                          const arrivalTime = format(
+                            new Date(routeSchedule.estimatedArrivalTime),
+                            "HH:mm"
+                          );
 
-                        // Create a more descriptive label
-                        const scheduleLabel = `${departureTime} - ${arrivalTime} | ${days}`;
+                          // Create a more descriptive label
+                          const scheduleLabel = `${departureTime} - ${arrivalTime} | ${days}`;
 
-                        return (
-                          <SelectItem
-                            key={routeSchedule.id}
-                            value={routeSchedule.id}
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">
-                                {scheduleLabel}
-                              </span>
-                              {routeSchedule.seasonStart &&
-                                routeSchedule.seasonEnd && (
+                          return (
+                            <SelectItem
+                              key={routeSchedule.id}
+                              value={routeSchedule.id}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {scheduleLabel}
+                                </span>
+                                {(routeSchedule.seasonStart ||
+                                  routeSchedule.seasonEnd) && (
                                   <span className="text-xs text-muted-foreground">
                                     Temporada:{" "}
-                                    {format(
-                                      new Date(routeSchedule.seasonStart),
-                                      "dd/MM/yyyy"
-                                    )}{" "}
+                                    {routeSchedule.seasonStart
+                                      ? format(
+                                          new Date(routeSchedule.seasonStart),
+                                          "dd/MM/yyyy",
+                                          { locale: es }
+                                        )
+                                      : "Sin inicio"}{" "}
                                     -{" "}
-                                    {format(
-                                      new Date(routeSchedule.seasonEnd),
-                                      "dd/MM/yyyy"
-                                    )}
+                                    {routeSchedule.seasonEnd
+                                      ? format(
+                                          new Date(routeSchedule.seasonEnd),
+                                          "dd/MM/yyyy",
+                                          { locale: es }
+                                        )
+                                      : "Sin fin"}
                                   </span>
                                 )}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
+                              </div>
+                            </SelectItem>
+                          );
+                        }
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -406,7 +430,10 @@ export function CreateScheduleDialog({
                               } else {
                                 // Default to current time if no time was set before
                                 const now = new Date();
-                                newDate.setHours(now.getHours(), now.getMinutes());
+                                newDate.setHours(
+                                  now.getHours(),
+                                  now.getMinutes()
+                                );
                               }
                               field.onChange(newDate);
                             }
@@ -418,10 +445,10 @@ export function CreateScheduleDialog({
                               // Compare only the date part, not the time
                               const departureDateOnly = new Date(departureDate);
                               departureDateOnly.setHours(0, 0, 0, 0);
-                              
+
                               const dateToCheck = new Date(date);
                               dateToCheck.setHours(0, 0, 0, 0);
-                              
+
                               return dateToCheck < departureDateOnly;
                             }
                             return date < new Date();
@@ -431,28 +458,38 @@ export function CreateScheduleDialog({
                         <div className="p-3 border-t border-border">
                           <Input
                             type="time"
-                            value={field.value ? format(field.value, "HH:mm") : ""}
+                            value={
+                              field.value ? format(field.value, "HH:mm") : ""
+                            }
                             onChange={(e) => {
-                              const [hours, minutes] = e.target.value.split(":");
-                              const newDate = new Date(field.value || new Date());
+                              const [hours, minutes] =
+                                e.target.value.split(":");
+                              const newDate = new Date(
+                                field.value || new Date()
+                              );
                               newDate.setHours(
                                 Number.parseInt(hours),
                                 Number.parseInt(minutes)
                               );
-                              
+
                               // Ensure arrival time is after departure time on the same day
                               const departureDate = form.watch("departureDate");
-                              if (departureDate && isSameDay(departureDate, newDate)) {
+                              if (
+                                departureDate &&
+                                isSameDay(departureDate, newDate)
+                              ) {
                                 const departureTime = departureDate.getTime();
                                 const arrivalTime = newDate.getTime();
-                                
+
                                 if (arrivalTime <= departureTime) {
                                   // If arrival time is before or equal to departure time,
                                   // set it to departure time + 15 minutes
-                                  newDate.setTime(departureTime + 15 * 60 * 1000);
+                                  newDate.setTime(
+                                    departureTime + 15 * 60 * 1000
+                                  );
                                 }
                               }
-                              
+
                               field.onChange(newDate);
                             }}
                           />
@@ -607,4 +644,4 @@ export function CreateScheduleDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}

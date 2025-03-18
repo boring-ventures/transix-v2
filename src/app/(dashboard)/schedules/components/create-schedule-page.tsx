@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, addMinutes } from "date-fns";
+import { format, addMinutes, isAfter, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon, Loader2, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,7 @@ export function CreateSchedulePage() {
   const [selectedRouteId, setSelectedRouteId] = useState<string>("");
   const { routeSchedules, isLoadingRouteSchedules } = useRouteSchedules({
     routeId: selectedRouteId,
+    active: true,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -83,13 +84,24 @@ export function CreateSchedulePage() {
     },
   });
 
+  // Filter out expired route schedules (where seasonEnd is before the current date)
+  const validRouteSchedules = useMemo(() => {
+    const today = new Date();
+    return routeSchedules.filter((schedule: RouteSchedule) => {
+      // If there is no seasonEnd, keep the schedule
+      if (!schedule.seasonEnd) return true;
+      // Keep the schedule if seasonEnd is after today
+      return isAfter(parseISO(schedule.seasonEnd), today);
+    });
+  }, [routeSchedules]);
+
   // Update route schedules when route changes
   useEffect(() => {
     const routeId = form.watch("routeId");
     if (routeId) {
       setSelectedRouteId(routeId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.watch("routeId")]);
 
   // Update estimated arrival time when route schedule changes
@@ -241,7 +253,7 @@ export function CreateSchedulePage() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="none">Ninguno</SelectItem>
-                          {routeSchedules.map(
+                          {validRouteSchedules.map(
                             (routeSchedule: RouteSchedule) => {
                               // Format operating days for better display
                               const daysMap: Record<string, string> = {
@@ -253,13 +265,41 @@ export function CreateSchedulePage() {
                                 "5": "Vie",
                                 "6": "Sáb",
                               };
+
+                              // Show season information in the label when available
+                              let seasonInfo = "";
+                              if (
+                                routeSchedule.seasonStart ||
+                                routeSchedule.seasonEnd
+                              ) {
+                                seasonInfo = " - Temporada: ";
+                                if (routeSchedule.seasonStart) {
+                                  seasonInfo += format(
+                                    parseISO(routeSchedule.seasonStart),
+                                    "dd/MM/yyyy",
+                                    { locale: es }
+                                  );
+                                } else {
+                                  seasonInfo += "Sin inicio";
+                                }
+                                seasonInfo += " a ";
+                                if (routeSchedule.seasonEnd) {
+                                  seasonInfo += format(
+                                    parseISO(routeSchedule.seasonEnd),
+                                    "dd/MM/yyyy",
+                                    { locale: es }
+                                  );
+                                } else {
+                                  seasonInfo += "Sin fin";
+                                }
+                              }
+
                               const days = routeSchedule.operatingDays
                                 .split(",")
                                 .map((day) => daysMap[day] || day)
                                 .join(", ");
 
-                              // Format time
-                              const time = format(
+                              const departureTime = format(
                                 new Date(routeSchedule.departureTime),
                                 "HH:mm",
                                 { locale: es }
@@ -270,7 +310,8 @@ export function CreateSchedulePage() {
                                   key={routeSchedule.id}
                                   value={routeSchedule.id}
                                 >
-                                  {time} ({days})
+                                  {days} - {departureTime}
+                                  {seasonInfo}
                                 </SelectItem>
                               );
                             }

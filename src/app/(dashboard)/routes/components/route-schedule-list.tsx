@@ -27,12 +27,16 @@ export function RouteScheduleList({ routeId }: RouteScheduleListProps) {
     null
   );
 
-  // Filter out expired schedules (where seasonEnd is before the current date)
-  const activeSchedules = useMemo(() => {
+  // Filter out expired schedules (where seasonEnd is before the current date) and inactive schedules
+  const validSchedules = useMemo(() => {
     const today = new Date();
     return routeSchedules.filter((schedule: RouteSchedule) => {
+      // Filter out inactive schedules
+      if (!schedule.active) return false;
+
       // If there is no seasonEnd, keep the schedule
       if (!schedule.seasonEnd) return true;
+
       // Keep the schedule if seasonEnd is after today
       return isAfter(parseISO(schedule.seasonEnd), today);
     });
@@ -146,7 +150,7 @@ export function RouteScheduleList({ routeId }: RouteScheduleListProps) {
       ) : (
         <>
           <DataTable
-            data={activeSchedules}
+            data={validSchedules}
             columns={columns}
             searchable={false}
             defaultSort={{ field: "departureTime", direction: "asc" }}
