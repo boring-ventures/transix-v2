@@ -274,6 +274,7 @@ export function SeatsStep({
       customer: customer,
       phone: customer.phone || "",
       email: customer.email || "",
+      documentId: customer.documentId || "", // Ensure documentId is never undefined
     };
 
     updateFormData({ passengers: updatedPassengers });
