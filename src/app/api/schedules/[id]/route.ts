@@ -31,15 +31,54 @@ export async function GET(
       bus: include.includes("bus"),
       primaryDriver: include.includes("primaryDriver"),
       secondaryDriver: include.includes("secondaryDriver"),
-      routeSchedule: include.includes("route")
+      routeSchedule: include.some((item) => item.startsWith("route"))
         ? {
             include: {
-              route: true,
+              route: {
+                include: {
+                  origin: include.some((item) => item.includes("route.origin")),
+                  destination: include.some((item) =>
+                    item.includes("route.destination")
+                  ),
+                },
+              },
             },
           }
-        : true,
-      tickets: include.includes("tickets"),
-      parcels: include.includes("parcels"),
+        : include.includes("route")
+          ? {
+              include: {
+                route: true,
+              },
+            }
+          : true,
+      tickets: include.some((item) => item.startsWith("tickets"))
+        ? {
+            include: {
+              busSeat: include.some((item) => item.includes("tickets.busSeat"))
+                ? {
+                    include: {
+                      tier: include.some((item) =>
+                        item.includes("tickets.busSeat.tier")
+                      ),
+                    },
+                  }
+                : true,
+              customer: include.some((item) =>
+                item.includes("tickets.customer")
+              ),
+            },
+          }
+        : include.includes("tickets"),
+      parcels: include.some((item) => item.startsWith("parcels"))
+        ? {
+            include: {
+              sender: include.some((item) => item.includes("parcels.sender")),
+              receiver: include.some((item) =>
+                item.includes("parcels.receiver")
+              ),
+            },
+          }
+        : include.includes("parcels"),
       _count: {
         select: {
           tickets: true,

@@ -1,27 +1,31 @@
 "use client";
 
-import { useState, } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Bus, 
-  User, 
-  Tag, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  MapPin,
+  Bus,
+  User,
+  Tag,
   AlertTriangle,
   CheckCircle,
   Edit,
-  Trash
+  Trash,
+  Eye,
+  RefreshCw,
+  ListChecks,
+  Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -36,20 +40,58 @@ import { useToast } from "@/components/ui/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useSchedule } from "@/hooks/use-schedule";
 import type { ScheduleStatus } from "@/types/schedule";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { useSchedules } from "@/hooks/use-schedules";
 
 interface ScheduleDetailClientProps {
   id: string;
 }
 
-export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) {
+export default function ScheduleDetailClient({
+  id,
+}: ScheduleDetailClientProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [loadingPassengerList, setLoadingPassengerList] = useState(false);
+  const [passengerList, setPassengerList] = useState<any[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const { schedule, isLoading, error, mutate } = useSchedule(id, {
-    include: "bus,primaryDriver,secondaryDriver,route,tickets,parcels"
+    include:
+      "bus,primaryDriver,secondaryDriver,route.origin,route.destination,tickets.busSeat.tier,tickets.customer,parcels.sender,parcels.receiver",
   });
+
+  const {
+    fetchPassengerList,
+    generatePassengerList,
+    isGeneratingPassengerList,
+  } = useSchedules();
 
   const handleBack = () => {
     router.push("/schedules");
@@ -84,7 +126,10 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
       console.error("Error updating status:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Error al actualizar el estado",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Error al actualizar el estado",
         variant: "destructive",
       });
     } finally {
@@ -108,14 +153,15 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
         title: "Viaje cancelado",
         description: "El viaje ha sido cancelado exitosamente",
       });
-      
+
       // Redirect back to schedules list after cancellation
       router.push("/schedules");
     } catch (error) {
       console.error("Error cancelling schedule:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Error al cancelar el viaje",
+        description:
+          error instanceof Error ? error.message : "Error al cancelar el viaje",
         variant: "destructive",
       });
       setIsCancelling(false);
@@ -155,6 +201,431 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
     return format(new Date(date), "HH:mm", { locale: es });
   };
 
+  // Load passenger list
+  const handleLoadPassengerList = async () => {
+    try {
+      setLoadingPassengerList(true);
+      const data = await fetchPassengerList(id);
+      setPassengerList(data);
+    } catch (error) {
+      console.error("Error loading passenger list:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la lista de pasajeros",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPassengerList(false);
+    }
+  };
+
+  // Generate passenger list
+  const handleGeneratePassengerList = async () => {
+    try {
+      await generatePassengerList.mutateAsync(id);
+      handleLoadPassengerList();
+    } catch (error) {
+      console.error("Error generating passenger list:", error);
+    }
+  };
+
+  // View ticket details
+  const handleViewTicketDetails = (ticket: any) => {
+    setSelectedTicket(ticket);
+  };
+
+  // Print trip details and passenger list
+  const handlePrint = async () => {
+    if (!schedule) return;
+
+    setIsPrinting(true);
+
+    try {
+      // Ensure passenger list is loaded
+      if (passengerList.length === 0) {
+        const data = await fetchPassengerList(id);
+        setPassengerList(data);
+      }
+
+      // Debug log for route data
+      console.log("Schedule data:", {
+        routeSchedule: schedule.routeSchedule,
+        routeName: schedule.routeSchedule?.route?.name,
+        origin: schedule.routeSchedule?.route?.origin?.name,
+        destination: schedule.routeSchedule?.route?.destination?.name,
+        busInfo: schedule.bus,
+        capacity: schedule.bus?.capacity,
+        ticketsCount: schedule.tickets?.length,
+        busSeatMatrix: schedule.bus?.seatMatrix,
+      });
+
+      // Create a new window for printing
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        toast({
+          title: "Error",
+          description:
+            "Por favor, permita las ventanas emergentes para imprimir.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get route information
+      const routeName =
+        schedule.routeSchedule?.route?.name || "Ruta no disponible";
+      const origin =
+        schedule.routeSchedule?.route?.origin?.name || "No disponible";
+      const destination =
+        schedule.routeSchedule?.route?.destination?.name || "No disponible";
+
+      // Format dates
+      const departureDate = formatDate(schedule.departureDate);
+      const departureTime = formatTime(schedule.departureDate);
+      const arrivalTime = formatTime(schedule.estimatedArrivalTime);
+
+      // Calculate capacity and occupancy from bus matrix if available, otherwise fallback to basic count
+      let totalSeats = 0;
+      if (schedule.bus?.seatMatrix) {
+        try {
+          const seatMatrix = JSON.parse(schedule.bus.seatMatrix);
+          totalSeats = seatMatrix.flat().filter(Boolean).length;
+        } catch (e) {
+          console.error("Error parsing seat matrix:", e);
+          totalSeats =
+            typeof schedule.bus?.capacity === "number"
+              ? schedule.bus.capacity
+              : parseInt(String(schedule.bus?.capacity || "0"), 10) || 0;
+        }
+      } else {
+        totalSeats =
+          typeof schedule.bus?.capacity === "number"
+            ? schedule.bus.capacity
+            : parseInt(String(schedule.bus?.capacity || "0"), 10) || 0;
+      }
+
+      const soldTickets = Array.isArray(schedule.tickets)
+        ? schedule.tickets.length
+        : 0;
+      const emptySeats = Math.max(0, totalSeats - soldTickets);
+      const occupancyRate =
+        totalSeats > 0 ? Math.round((soldTickets / totalSeats) * 100) : 0;
+
+      // Format route display with fallback values
+      const routeDisplay =
+        origin &&
+        destination &&
+        origin !== "No disponible" &&
+        destination !== "No disponible"
+          ? `${origin} <> ${destination}`
+          : routeName || "Ruta no disponible";
+
+      // Generate the HTML content
+      const content = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Detalles de Viaje - ${routeName}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              margin: 0;
+              padding: 20px;
+              color: hsl(0 0% 0%);
+              background-color: hsl(0 0% 100%);
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              padding-bottom: 10px;
+              border-bottom: 2px solid #ddd;
+              position: relative;
+            }
+            .company-name {
+              font-size: 24px;
+              font-weight: bold;
+              margin: 0;
+              color: hsl(0 100% 45%);
+            }
+            .document-title {
+              font-size: 22px;
+              margin: 10px 0 5px 0;
+              color: #000;
+            }
+            .trip-info {
+              margin-bottom: 20px;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 10px;
+              margin-bottom: 20px;
+            }
+            .info-item {
+              padding: 8px;
+              border-bottom: 1px solid #eee;
+            }
+            .info-label {
+              font-weight: bold;
+              margin-right: 5px;
+              color: hsl(0 0% 45%);
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 20px;
+              font-size: 12px;
+            }
+            th, td {
+              padding: 8px;
+              text-align: left;
+              border-bottom: 1px solid #ddd;
+            }
+            th {
+              background-color: hsl(0 0% 96%);
+              font-weight: bold;
+            }
+            .section-title {
+              font-size: 16px;
+              font-weight: bold;
+              margin: 20px 0 10px 0;
+              padding-bottom: 5px;
+              border-bottom: 1px solid #ddd;
+              color: hsl(0 100% 45%);
+            }
+            .footer {
+              margin-top: 30px;
+              text-align: center;
+              font-size: 10px;
+              color: hsl(0 0% 45%);
+              border-top: 1px solid #eee;
+              padding-top: 10px;
+            }
+            .stats-container {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 20px;
+              flex-wrap: wrap;
+            }
+            .stat-box {
+              background-color: hsl(0 0% 96%);
+              border: 1px solid hsl(0 0% 90%);
+              border-radius: 6px;
+              padding: 15px;
+              width: calc(25% - 15px);
+              box-sizing: border-box;
+              text-align: center;
+              margin-bottom: 10px;
+            }
+            .stat-value {
+              font-size: 20px;
+              font-weight: bold;
+              color: hsl(0 100% 45%);
+              margin: 0;
+            }
+            .stat-label {
+              font-size: 12px;
+              color: hsl(0 0% 45%);
+              margin: 5px 0 0 0;
+            }
+            .badge {
+              display: inline-block;
+              padding: 3px 6px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: bold;
+            }
+            .badge-default {
+              background-color: hsl(0 100% 45%);
+              color: white;
+            }
+            .badge-outline {
+              background-color: transparent;
+              border: 1px solid hsl(0 0% 90%);
+              color: hsl(0 0% 0%);
+            }
+            .badge-destructive {
+              background-color: hsl(0 84% 60%);
+              color: white;
+            }
+            .badge-secondary {
+              background-color: hsl(0 0% 15%);
+              color: white;
+            }
+            @media print {
+              body {
+                padding: 0;
+                margin: 0;
+              }
+              button {
+                display: none;
+              }
+              @page {
+                size: A4;
+                margin: 1cm;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <p class="company-name">FLOTA IMPERIAL POTOSI</p>
+            <h1 class="document-title">DETALLES DEL VIAJE</h1>
+            <p>${routeDisplay} - ${departureDate}</p>
+          </div>
+          
+          <div class="stats-container">
+            <div class="stat-box">
+              <p class="stat-value">${soldTickets || 0}</p>
+              <p class="stat-label">Asientos Ocupados</p>
+            </div>
+            <div class="stat-box">
+              <p class="stat-value">${emptySeats || 0}</p>
+              <p class="stat-label">Asientos Vacíos</p>
+            </div>
+            <div class="stat-box">
+              <p class="stat-value">${occupancyRate || 0}%</p>
+              <p class="stat-label">Tasa de Ocupación</p>
+            </div>
+            <div class="stat-box">
+              <p class="stat-value">
+                <span class="badge ${
+                  schedule.status === "scheduled"
+                    ? "badge-outline"
+                    : schedule.status === "in_progress"
+                      ? "badge-default"
+                      : schedule.status === "completed"
+                        ? "badge-secondary"
+                        : schedule.status === "cancelled"
+                          ? "badge-destructive"
+                          : "badge-default"
+                }">
+                  ${getStatusLabel(schedule.status)}
+                </span>
+              </p>
+              <p class="stat-label">Estado del Viaje</p>
+            </div>
+          </div>
+          
+          <div class="section-title">Información General</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">Ruta:</span> ${routeName}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Fecha:</span> ${departureDate}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Hora de Salida:</span> ${departureTime}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Llegada Estimada:</span> ${arrivalTime}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Bus:</span> ${schedule.bus?.plateNumber || "No asignado"}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Capacidad:</span> ${totalSeats} pasajeros
+            </div>
+            <div class="info-item">
+              <span class="info-label">Conductor Principal:</span> ${schedule.primaryDriver?.fullName || "No asignado"}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Conductor Secundario:</span> ${schedule.secondaryDriver?.fullName || "No asignado"}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Origen:</span> ${origin}
+            </div>
+            <div class="info-item">
+              <span class="info-label">Destino:</span> ${destination}
+            </div>
+          </div>
+          
+          <div class="section-title">Lista de Pasajeros</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nro</th>
+                <th>Asiento</th>
+                <th>Nombre</th>
+                <th>Documento</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                schedule.tickets && schedule.tickets.length > 0
+                  ? schedule.tickets
+                      .map(
+                        (ticket: any, index: number) => `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${ticket.busSeat?.seatNumber || "N/A"}</td>
+                    <td>${ticket.customer?.fullName || "No asignado"}</td>
+                    <td>${ticket.customer?.documentId || "NO PORTA"}</td>
+                  </tr>
+                `
+                      )
+                      .join("")
+                  : `<tr><td colspan="4" style="text-align: center;">No hay pasajeros registrados para este viaje</td></tr>`
+              }
+            </tbody>
+          </table>
+          
+          <div class="footer">
+            <p>Documento generado el ${new Date().toLocaleString("es-ES")} | FLOTA IMPERIAL POTOSI</p>
+            <p>Este documento es de carácter informativo y puede estar sujeto a cambios.</p>
+          </div>
+          
+          <script>
+            // Auto print and close the window after printing is done
+            window.onload = function() {
+              setTimeout(() => {
+                window.print();
+                // Don't close automatically to allow user to see the print preview
+              }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `;
+
+      // Write to the new window
+      printWindow.document.write(content);
+      printWindow.document.close();
+    } catch (error) {
+      console.error("Error printing trip details:", error);
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al imprimir los detalles del viaje",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  // Load passenger list on mount
+  useEffect(() => {
+    if (id) {
+      handleLoadPassengerList();
+
+      // Debug log when schedule data loads
+      if (schedule) {
+        console.log("Schedule data loaded:", {
+          routeSchedule: schedule.routeSchedule,
+          route: schedule.routeSchedule?.route,
+          origin: schedule.routeSchedule?.route?.origin,
+          destination: schedule.routeSchedule?.route?.destination,
+          bus: schedule.bus,
+          busCapacity: schedule.bus?.capacity,
+        });
+      }
+    }
+  }, [id, schedule]);
+
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
@@ -170,7 +641,9 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
           <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
           <h2 className="text-2xl font-bold mb-2">Error al cargar el viaje</h2>
           <p className="text-muted-foreground mb-4">
-            {error instanceof Error ? error.message : "No se pudo encontrar la información del viaje"}
+            {error instanceof Error
+              ? error.message
+              : "No se pudo encontrar la información del viaje"}
           </p>
           <Button onClick={handleBack}>Volver a la lista</Button>
         </div>
@@ -193,39 +666,45 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
           Detalle de Viaje: {routeName}
         </h1>
         <div className="flex gap-2">
-          {schedule.status !== "cancelled" && schedule.status !== "completed" && (
-            <>
-              <Button variant="outline" onClick={handleEdit}>
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">
-                    <Trash className="h-4 w-4 mr-2" />
-                    Cancelar Viaje
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta acción cancelará el viaje programado y no se puede deshacer.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={cancelSchedule}
-                      disabled={isCancelling}
-                    >
-                      {isCancelling ? "Cancelando..." : "Confirmar"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          )}
+          <Button variant="outline" onClick={handlePrint} disabled={isPrinting}>
+            <Printer className="h-4 w-4 mr-2" />
+            {isPrinting ? "Imprimiendo..." : "Imprimir Detalles"}
+          </Button>
+          {schedule.status !== "cancelled" &&
+            schedule.status !== "completed" && (
+              <>
+                <Button variant="outline" onClick={handleEdit}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">
+                      <Trash className="h-4 w-4 mr-2" />
+                      Cancelar Viaje
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción cancelará el viaje programado y no se puede
+                        deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={cancelSchedule}
+                        disabled={isCancelling}
+                      >
+                        {isCancelling ? "Cancelando..." : "Confirmar"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
         </div>
       </div>
 
@@ -244,17 +723,23 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="font-medium">Fecha:</span>
-                <span className="ml-2">{formatDate(schedule.departureDate)}</span>
+                <span className="ml-2">
+                  {formatDate(schedule.departureDate)}
+                </span>
               </div>
               <div className="flex items-center">
                 <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="font-medium">Hora de salida:</span>
-                <span className="ml-2">{formatTime(schedule.departureDate)}</span>
+                <span className="ml-2">
+                  {formatTime(schedule.departureDate)}
+                </span>
               </div>
               <div className="flex items-center">
                 <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="font-medium">Llegada estimada:</span>
-                <span className="ml-2">{formatTime(schedule.estimatedArrivalTime)}</span>
+                <span className="ml-2">
+                  {formatTime(schedule.estimatedArrivalTime)}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -269,17 +754,23 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
               <div className="flex items-center">
                 <Bus className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="font-medium">Bus:</span>
-                <span className="ml-2">{schedule.bus?.plateNumber || "No asignado"}</span>
+                <span className="ml-2">
+                  {schedule.bus?.plateNumber || "No asignado"}
+                </span>
               </div>
               <div className="flex items-center">
                 <User className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="font-medium">Conductor principal:</span>
-                <span className="ml-2">{schedule.primaryDriver?.fullName || "No asignado"}</span>
+                <span className="ml-2">
+                  {schedule.primaryDriver?.fullName || "No asignado"}
+                </span>
               </div>
               <div className="flex items-center">
                 <User className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="font-medium">Conductor secundario:</span>
-                <span className="ml-2">{schedule.secondaryDriver?.fullName || "No asignado"}</span>
+                <span className="ml-2">
+                  {schedule.secondaryDriver?.fullName || "No asignado"}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -354,11 +845,13 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
         </Card>
       )}
 
-      <Tabs defaultValue="tickets">
-        <TabsList>
+      <Tabs defaultValue="tickets" className="mt-6">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="tickets">Boletos ({ticketCount})</TabsTrigger>
+          <TabsTrigger value="passengers">Pasajeros a bordo</TabsTrigger>
           <TabsTrigger value="parcels">Encomiendas ({parcelCount})</TabsTrigger>
         </TabsList>
+
         <TabsContent value="tickets">
           <Card>
             <CardHeader>
@@ -366,18 +859,292 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
             </CardHeader>
             <CardContent>
               {schedule.tickets && schedule.tickets.length > 0 ? (
-                <div className="space-y-4">
-                  {/* Ticket list would go here */}
-                  <p>Lista de boletos vendidos para este viaje</p>
+                <div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Asiento</TableHead>
+                        <TableHead>Nivel</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Precio</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schedule.tickets.map((ticket: any) => (
+                        <TableRow key={ticket.id}>
+                          <TableCell className="font-medium">
+                            {ticket.busSeat?.seatNumber || "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            {ticket.busSeat?.tier?.name || "Estándar"}
+                          </TableCell>
+                          <TableCell>
+                            {ticket.customer?.fullName || "No asignado"}
+                            {ticket.customer?.documentId && (
+                              <div className="text-xs text-muted-foreground">
+                                ID: {ticket.customer.documentId}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            $
+                            {typeof ticket.price === "number"
+                              ? ticket.price.toFixed(2)
+                              : ticket.price}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                ticket.status === "active"
+                                  ? "default"
+                                  : "destructive"
+                              }
+                            >
+                              {ticket.status === "active"
+                                ? "Activo"
+                                : "Cancelado"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleViewTicketDetails(ticket)
+                                    }
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Ver detalles</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {/* Ticket Details Sheet */}
+                  {selectedTicket && (
+                    <Sheet
+                      open={!!selectedTicket}
+                      onOpenChange={() => setSelectedTicket(null)}
+                    >
+                      <SheetContent>
+                        <SheetHeader>
+                          <SheetTitle>Detalles del boleto</SheetTitle>
+                          <SheetDescription>
+                            Información detallada del boleto seleccionado
+                          </SheetDescription>
+                        </SheetHeader>
+                        <div className="py-4 space-y-4">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Asiento</p>
+                            <p className="text-sm text-muted-foreground">
+                              {selectedTicket.busSeat?.seatNumber || "N/A"} (
+                              {selectedTicket.busSeat?.tier?.name || "Estándar"}
+                              )
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Cliente</p>
+                            <p className="text-sm text-muted-foreground">
+                              {selectedTicket.customer?.fullName ||
+                                "No asignado"}
+                            </p>
+                          </div>
+                          {selectedTicket.customer?.documentId && (
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">Documento</p>
+                              <p className="text-sm text-muted-foreground">
+                                {selectedTicket.customer.documentId}
+                              </p>
+                            </div>
+                          )}
+                          {selectedTicket.customer?.phone && (
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">Teléfono</p>
+                              <p className="text-sm text-muted-foreground">
+                                {selectedTicket.customer.phone}
+                              </p>
+                            </div>
+                          )}
+                          {selectedTicket.customer?.email && (
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">Email</p>
+                              <p className="text-sm text-muted-foreground">
+                                {selectedTicket.customer.email}
+                              </p>
+                            </div>
+                          )}
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Precio</p>
+                            <p className="text-sm text-muted-foreground">
+                              $
+                              {typeof selectedTicket.price === "number"
+                                ? selectedTicket.price.toFixed(2)
+                                : selectedTicket.price}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Estado</p>
+                            <Badge
+                              variant={
+                                selectedTicket.status === "active"
+                                  ? "default"
+                                  : "destructive"
+                              }
+                            >
+                              {selectedTicket.status === "active"
+                                ? "Activo"
+                                : "Cancelado"}
+                            </Badge>
+                          </div>
+                          {selectedTicket.purchasedAt && (
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">
+                                Fecha de compra
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {formatDate(selectedTicket.purchasedAt)} -{" "}
+                                {formatTime(selectedTicket.purchasedAt)}
+                              </p>
+                            </div>
+                          )}
+                          {selectedTicket.notes && (
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium">Notas</p>
+                              <p className="text-sm text-muted-foreground">
+                                {selectedTicket.notes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <SheetFooter>
+                          <SheetClose asChild>
+                            <Button variant="outline">Cerrar</Button>
+                          </SheetClose>
+                        </SheetFooter>
+                      </SheetContent>
+                    </Sheet>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No hay boletos vendidos para este viaje</p>
+                  <p className="text-muted-foreground">
+                    No hay boletos vendidos para este viaje
+                  </p>
                 </div>
               )}
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="passengers">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Pasajeros a bordo</CardTitle>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadPassengerList}
+                  disabled={loadingPassengerList}
+                >
+                  {loadingPassengerList ? (
+                    <>
+                      <LoadingSpinner className="mr-2 h-4 w-4" />
+                      Cargando...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Actualizar
+                    </>
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleGeneratePassengerList}
+                  disabled={isGeneratingPassengerList}
+                >
+                  {isGeneratingPassengerList ? (
+                    <>
+                      <LoadingSpinner className="mr-2 h-4 w-4" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <ListChecks className="mr-2 h-4 w-4" />
+                      Generar lista
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {passengerList.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asiento</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Documento</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {passengerList.map((passenger) => (
+                      <TableRow key={passenger.id}>
+                        <TableCell className="font-medium">
+                          {passenger.seatNumber}
+                        </TableCell>
+                        <TableCell>{passenger.fullName}</TableCell>
+                        <TableCell>{passenger.documentId || "N/A"}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              passenger.status === "confirmed"
+                                ? "default"
+                                : passenger.status === "cancelled"
+                                  ? "destructive"
+                                  : "outline"
+                            }
+                          >
+                            {passenger.status === "confirmed"
+                              ? "Confirmado"
+                              : passenger.status === "cancelled"
+                                ? "Cancelado"
+                                : "No se presentó"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    No hay datos de pasajeros disponibles para este viaje.
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Haga clic en &quot;Generar lista&quot; para crear una lista
+                    de pasajeros basada en los boletos vendidos.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="parcels">
           <Card>
             <CardHeader>
@@ -386,12 +1153,58 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
             <CardContent>
               {schedule.parcels && schedule.parcels.length > 0 ? (
                 <div className="space-y-4">
-                  {/* Parcel list would go here */}
-                  <p>Lista de encomiendas para este viaje</p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tracking</TableHead>
+                        <TableHead>Descripción</TableHead>
+                        <TableHead>Remitente</TableHead>
+                        <TableHead>Destinatario</TableHead>
+                        <TableHead>Estado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schedule.parcels.map((parcel: any) => (
+                        <TableRow key={parcel.id}>
+                          <TableCell className="font-medium">
+                            {parcel.trackingNumber}
+                          </TableCell>
+                          <TableCell>{parcel.description || "N/A"}</TableCell>
+                          <TableCell>
+                            {parcel.sender?.fullName || "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            {parcel.receiver?.fullName || "N/A"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                parcel.status === "delivered"
+                                  ? "secondary"
+                                  : parcel.status === "in_transit"
+                                    ? "default"
+                                    : "outline"
+                              }
+                            >
+                              {parcel.status === "pending"
+                                ? "Pendiente"
+                                : parcel.status === "in_transit"
+                                  ? "En tránsito"
+                                  : parcel.status === "delivered"
+                                    ? "Entregado"
+                                    : parcel.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No hay encomiendas para este viaje</p>
+                  <p className="text-muted-foreground">
+                    No hay encomiendas para este viaje
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -400,4 +1213,4 @@ export default function ScheduleDetailClient({ id }: ScheduleDetailClientProps) 
       </Tabs>
     </div>
   );
-} 
+}

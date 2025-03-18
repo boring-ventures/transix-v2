@@ -34,11 +34,18 @@ export function useBulkTickets() {
         });
 
         console.log("Bulk tickets response status:", response.status);
-        
+
         if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Bulk tickets error:", errorData);
-          throw new Error(errorData.error || "Failed to create tickets");
+          let errorMessage = "Failed to create tickets";
+          try {
+            const errorData = await response.json();
+            console.error("Bulk tickets error:", errorData);
+            errorMessage = errorData.error || errorMessage;
+          } catch (jsonError) {
+            console.error("Error parsing error response:", jsonError);
+            errorMessage = `Request failed with status: ${response.status}`;
+          }
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -70,4 +77,4 @@ export function useBulkTickets() {
     error,
     createBulkTickets,
   };
-} 
+}

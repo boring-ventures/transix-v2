@@ -24,7 +24,8 @@ export function ConfirmationStep({
   calculateTotalPrice,
   goToNextStep,
 }: ConfirmationStepProps) {
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState<Record<number, boolean>>({});
+  const [isPrintingAll, setIsPrintingAll] = useState(false);
   const { locations } = useLocations();
 
   // Get location names
@@ -36,11 +37,74 @@ export function ConfirmationStep({
     (l: LocationWithId) => l.id === formData.destinationId
   )?.name;
 
-  // Handle print tickets
-  const handlePrintTickets = () => {
-    setIsPrinting(true);
+  // Handle print single ticket
+  const handlePrintSingleTicket = (passenger: any, index: number) => {
+    setIsPrinting({ ...isPrinting, [index]: true });
 
-    // Create a printable version of the tickets
+    // Create a printable version of the single ticket
+    const printContent = document.createElement("div");
+    printContent.innerHTML = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <h1 style="text-align: center; color: #e11d48;">Boleto de Viaje</h1>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <p style="font-size: 18px; font-weight: bold;">${originName} - ${destinationName}</p>
+          <p>Fecha: ${formatDate(new Date())} • Hora: ${formatTime(new Date())}</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2>Detalles de Pasajero</h2>
+          <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
+            <p style="font-weight: bold; margin: 0;">Pasajero: ${passenger.fullName}</p>
+            <p style="margin: 5px 0;">Documento: ${passenger.documentId}</p>
+            <p style="margin: 5px 0;">Asiento: ${passenger.seatNumber}</p>
+            ${passenger.phone ? `<p style="margin: 5px 0;">Teléfono: ${passenger.phone}</p>` : ""}
+            ${passenger.email ? `<p style="margin: 5px 0;">Email: ${passenger.email}</p>` : ""}
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px; color: #666; font-size: 12px;">
+          <p>Gracias por su compra. Por favor, presente este boleto al abordar.</p>
+          <p>Fecha de emisión: ${new Date().toLocaleString()}</p>
+        </div>
+      </div>
+    `;
+
+    // Create a new window for printing
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Boleto de Viaje - ${passenger.fullName}</title>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+      printWindow.focus();
+
+      // Print after a short delay to ensure content is loaded
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+        setIsPrinting({ ...isPrinting, [index]: false });
+      }, 500);
+    } else {
+      setIsPrinting({ ...isPrinting, [index]: false });
+      alert(
+        "Por favor, permita las ventanas emergentes para imprimir los boletos."
+      );
+    }
+  };
+
+  // Handle print all tickets
+  const handlePrintAllTickets = () => {
+    setIsPrintingAll(true);
+
+    // Create a printable version of all tickets
     const printContent = document.createElement("div");
     printContent.innerHTML = `
       <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
@@ -99,10 +163,10 @@ export function ConfirmationStep({
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
-        setIsPrinting(false);
+        setIsPrintingAll(false);
       }, 500);
     } else {
-      setIsPrinting(false);
+      setIsPrintingAll(false);
       alert(
         "Por favor, permita las ventanas emergentes para imprimir los boletos."
       );
@@ -153,6 +217,18 @@ export function ConfirmationStep({
                       )}
                     </div>
                   </div>
+                  <div className="mt-2 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePrintSingleTicket(passenger, index)}
+                      disabled={isPrinting[index]}
+                      className="flex items-center gap-1"
+                    >
+                      <Printer className="h-3 w-3" />
+                      {isPrinting[index] ? "Imprimiendo..." : "Imprimir Boleto"}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -171,12 +247,12 @@ export function ConfirmationStep({
         <CardFooter className="flex justify-between">
           <Button
             variant="outline"
-            onClick={handlePrintTickets}
-            disabled={isPrinting}
+            onClick={handlePrintAllTickets}
+            disabled={isPrintingAll}
             className="flex items-center gap-2"
           >
             <Printer className="h-4 w-4" />
-            {isPrinting ? "Imprimiendo..." : "Imprimir Boletos"}
+            {isPrintingAll ? "Imprimiendo..." : "Imprimir Todos"}
           </Button>
           <Button onClick={goToNextStep} className="flex items-center gap-2">
             <Download className="h-4 w-4" />
