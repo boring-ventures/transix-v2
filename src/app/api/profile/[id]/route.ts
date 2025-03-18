@@ -7,11 +7,11 @@ import type { Profile } from "@prisma/client";
 // Get a specific profile by ID
 const getProfile = async (
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) => {
   try {
     // Get the user ID from the route parameter
-    const { id } = context.params;
+    const { id } = await context.params;
 
     // First check if this is a userId (from Supabase) or a profile ID
     let profile: Profile | null = null;

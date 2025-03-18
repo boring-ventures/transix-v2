@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useRouteSchedules,
   type RouteSchedule,
@@ -9,7 +9,7 @@ import { DataTable } from "@/components/table/data-table";
 import { LoadingTable } from "@/components/table/loading-table";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Calendar } from "lucide-react";
-import { format } from "date-fns";
+import { format, isAfter, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CreateRouteScheduleDialog } from "./create-route-schedule-dialog";
 import type { Column } from "@/components/table/types";
@@ -27,9 +27,25 @@ export function RouteScheduleList({ routeId }: RouteScheduleListProps) {
     null
   );
 
+  // Filter out expired schedules (where seasonEnd is before the current date)
+  const activeSchedules = useMemo(() => {
+    const today = new Date();
+    return routeSchedules.filter((schedule: RouteSchedule) => {
+      // If there is no seasonEnd, keep the schedule
+      if (!schedule.seasonEnd) return true;
+      // Keep the schedule if seasonEnd is after today
+      return isAfter(parseISO(schedule.seasonEnd), today);
+    });
+  }, [routeSchedules]);
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return format(date, "HH:mm", { locale: es });
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    return format(parseISO(dateString), "dd/MM/yyyy", { locale: es });
   };
 
   const formatOperatingDays = (days: string) => {
@@ -87,6 +103,30 @@ export function RouteScheduleList({ routeId }: RouteScheduleListProps) {
       sortable: true,
     },
     {
+      id: "seasonStart",
+      header: "Inicio de Temporada",
+      accessorKey: "seasonStart",
+      cell: ({ row }) => (
+        <div className="flex items-center">
+          <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+          {formatDate(row.seasonStart)}
+        </div>
+      ),
+      sortable: true,
+    },
+    {
+      id: "seasonEnd",
+      header: "Fin de Temporada",
+      accessorKey: "seasonEnd",
+      cell: ({ row }) => (
+        <div className="flex items-center">
+          <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+          {formatDate(row.seasonEnd)}
+        </div>
+      ),
+      sortable: true,
+    },
+    {
       id: "status",
       header: "Estado",
       accessorKey: "active",
@@ -102,11 +142,11 @@ export function RouteScheduleList({ routeId }: RouteScheduleListProps) {
   return (
     <div>
       {isLoadingRouteSchedules ? (
-        <LoadingTable columnCount={4} rowCount={5} />
+        <LoadingTable columnCount={6} rowCount={5} />
       ) : (
         <>
           <DataTable
-            data={routeSchedules}
+            data={activeSchedules}
             columns={columns}
             searchable={false}
             defaultSort={{ field: "departureTime", direction: "asc" }}
