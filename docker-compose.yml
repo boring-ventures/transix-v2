@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  app:
+    container_name: transix-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      # Database connection settings
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres?pgbouncer=true
+      - DIRECT_URL=postgresql://postgres:postgres@db:5432/postgres
+      # Supabase settings
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET=${NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET}
+    networks:
+      - transix-network
+
+  db:
+    container_name: transix-db
+    image: postgres:16-alpine
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - transix-network
+
+networks:
+  transix-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
