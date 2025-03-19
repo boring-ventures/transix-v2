@@ -62,11 +62,8 @@ const createProfile = async (req: Request) => {
   }
 };
 
-// Only superadmin and company_admin can create profiles
-export const POST = withRoleProtection(createProfile, [
-  "superadmin",
-  "company_admin",
-]);
+// Make the POST request public - no authentication required
+export const POST = createProfile;
 
 const getProfiles = async (req: Request) => {
   try {

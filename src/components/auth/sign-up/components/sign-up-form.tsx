@@ -1,4 +1,4 @@
-'use client'
+"use client";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -56,12 +56,20 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
   async function onSubmit(data: SignUpFormData) {
     try {
       setIsLoading(true);
+      console.log("Starting sign-up process...");
 
       // First create the auth user
       const { success, user, session, error } = await signUp(
         data.email,
         data.password
       );
+
+      console.log("Sign-up auth result:", {
+        success,
+        user: !!user,
+        session: !!session,
+        error,
+      });
 
       if (!success || error || !session) {
         throw error || new Error("Failed to sign up");
@@ -72,7 +80,9 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
         let avatarUrl = null;
         if (avatarFile) {
           try {
+            console.log("Uploading avatar...");
             avatarUrl = await uploadAvatar(avatarFile, user.id);
+            console.log("Avatar uploaded successfully");
           } catch (error) {
             console.error("Avatar upload failed:", error);
             toast({
@@ -84,42 +94,71 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
           }
         }
 
-        // Create profile immediately with user ID
-        const response = await fetch("/api/profile", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            fullName: data.fullName,
-            email: data.email,
-            avatarUrl,
-          }),
-        });
+        // Try to create profile with a retry mechanism
+        let profileCreated = false;
+        let retryCount = 0;
+        const maxRetries = 3;
 
-        let result: Record<string, unknown>;
-        let text = ""; // Define text outside the try block
-
-        try {
-          text = await response.text(); // Assign value inside try
-          result = text ? JSON.parse(text) : {};
-
-          if (!response.ok) {
-            throw new Error(
-              typeof result.error === "string"
-                ? result.error
-                : `Server responded with status ${response.status}`
+        while (!profileCreated && retryCount < maxRetries) {
+          try {
+            console.log(
+              `Attempting to create profile (attempt ${retryCount + 1})...`
             );
+
+            // Create profile immediately with user ID
+            const response = await fetch("/api/profile", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                userId: user.id,
+                fullName: data.fullName,
+                email: data.email,
+                avatarUrl,
+              }),
+            });
+
+            const text = await response.text();
+            console.log(
+              `Profile creation response (${response.status}):`,
+              text
+            );
+
+            const result = text ? JSON.parse(text) : {};
+
+            if (!response.ok) {
+              if (response.status === 409) {
+                // Profile already exists, consider this a success
+                console.log("Profile already exists, continuing...");
+                profileCreated = true;
+              } else {
+                throw new Error(
+                  typeof result.error === "string"
+                    ? result.error
+                    : `Server responded with status ${response.status}`
+                );
+              }
+            } else {
+              profileCreated = true;
+              console.log("Profile created successfully");
+            }
+          } catch (profileError) {
+            console.error(
+              `Profile creation attempt ${retryCount + 1} failed:`,
+              profileError
+            );
+            retryCount++;
+
+            if (retryCount >= maxRetries) {
+              throw new Error(
+                "Failed to create user profile after multiple attempts"
+              );
+            }
+
+            // Wait before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
-        } catch (parseError) {
-          console.error(
-            "Response parsing error:",
-            parseError,
-            "Response text:",
-            text
-          );
-          throw new Error("Invalid server response");
         }
 
         toast({
