@@ -247,16 +247,16 @@ export default function ScheduleDetailClient({
         setPassengerList(data);
       }
 
-      // Debug log for route data
-      console.log("Schedule data:", {
-        routeSchedule: schedule.routeSchedule,
-        routeName: schedule.routeSchedule?.route?.name,
-        origin: schedule.routeSchedule?.route?.origin?.name,
-        destination: schedule.routeSchedule?.route?.destination?.name,
-        busInfo: schedule.bus,
-        capacity: schedule.bus?.capacity,
-        ticketsCount: schedule.tickets?.length,
-        busSeatMatrix: schedule.bus?.seatMatrix,
+      // Get schedule and bus details
+      console.log("Schedule and bus data:", {
+        scheduleId: schedule.id,
+        bus: schedule.bus,
+        busId: schedule.bus?.id,
+        plateNumber: schedule.bus?.plateNumber,
+        seatMatrix: schedule.bus?.seatMatrix,
+        scheduledSeats: schedule.scheduledSeats,
+        tickets: schedule.tickets?.length,
+        ticketSeats: schedule.tickets?.map((t) => t.busSeat?.seatNumber),
       });
 
       // Create a new window for printing
@@ -271,6 +271,16 @@ export default function ScheduleDetailClient({
         return;
       }
 
+      // Get current date/time for header
+      const currentDateTime = new Date().toLocaleString("es-ES", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
       // Get route information
       const routeName =
         schedule.routeSchedule?.route?.name || "Ruta no disponible";
@@ -284,32 +294,8 @@ export default function ScheduleDetailClient({
       const departureTime = formatTime(schedule.departureDate);
       const arrivalTime = formatTime(schedule.estimatedArrivalTime);
 
-      // Calculate capacity and occupancy from bus matrix if available, otherwise fallback to basic count
-      let totalSeats = 0;
-      if (schedule.bus?.seatMatrix) {
-        try {
-          const seatMatrix = JSON.parse(schedule.bus.seatMatrix);
-          totalSeats = seatMatrix.flat().filter(Boolean).length;
-        } catch (e) {
-          console.error("Error parsing seat matrix:", e);
-          totalSeats =
-            typeof schedule.bus?.capacity === "number"
-              ? schedule.bus.capacity
-              : parseInt(String(schedule.bus?.capacity || "0"), 10) || 0;
-        }
-      } else {
-        totalSeats =
-          typeof schedule.bus?.capacity === "number"
-            ? schedule.bus.capacity
-            : parseInt(String(schedule.bus?.capacity || "0"), 10) || 0;
-      }
-
-      const soldTickets = Array.isArray(schedule.tickets)
-        ? schedule.tickets.length
-        : 0;
-      const emptySeats = Math.max(0, totalSeats - soldTickets);
-      const occupancyRate =
-        totalSeats > 0 ? Math.round((soldTickets / totalSeats) * 100) : 0;
+      // Get the bus plate number
+      const busPlateNumber = schedule.bus?.plateNumber || "No asignado";
 
       // Format route display with fallback values
       const routeDisplay =
@@ -320,6 +306,26 @@ export default function ScheduleDetailClient({
           ? `${origin} <> ${destination}`
           : routeName || "Ruta no disponible";
 
+      // Format conductor names and details
+      const conductorPrincipal =
+        schedule.primaryDriver?.fullName || "No asignado";
+      const conductorSecundario =
+        schedule.secondaryDriver?.fullName || "No asignado";
+
+      // Driver license details
+      const licenciaPrincipal = schedule.primaryDriver?.licenseNumber || "N/A";
+      const categoriaPrincipal =
+        schedule.primaryDriver?.licenseCategory || "N/A";
+      const licenciaSecundaria =
+        schedule.secondaryDriver?.licenseNumber || "N/A";
+      const categoriaSecundaria =
+        schedule.secondaryDriver?.licenseCategory || "N/A";
+
+      // Get total passenger count
+      const totalPasajeros = Array.isArray(schedule.tickets)
+        ? schedule.tickets.length
+        : 0;
+
       // Generate the HTML content
       const content = `
         <!DOCTYPE html>
@@ -327,7 +333,7 @@ export default function ScheduleDetailClient({
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Detalles de Viaje - ${routeName}</title>
+          <title>Detalles de Viaje - ${departureDate}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -337,11 +343,18 @@ export default function ScheduleDetailClient({
               color: hsl(0 0% 0%);
               background-color: hsl(0 0% 100%);
             }
+            .print-header {
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+              color: #666;
+              margin-bottom: 10px;
+            }
             .header {
               text-align: center;
               margin-bottom: 20px;
               padding-bottom: 10px;
-              border-bottom: 2px solid #ddd;
+              border-bottom: 1px solid #ddd;
               position: relative;
             }
             .company-name {
@@ -355,6 +368,10 @@ export default function ScheduleDetailClient({
               margin: 10px 0 5px 0;
               color: #000;
             }
+            .route-info {
+              font-size: 16px;
+              margin: 10px 0;
+            }
             .trip-info {
               margin-bottom: 20px;
             }
@@ -367,11 +384,16 @@ export default function ScheduleDetailClient({
             .info-item {
               padding: 8px;
               border-bottom: 1px solid #eee;
+              display: flex;
             }
             .info-label {
               font-weight: bold;
               margin-right: 5px;
               color: hsl(0 0% 45%);
+              width: 160px;
+            }
+            .info-value {
+              flex: 1;
             }
             table {
               width: 100%;
@@ -406,7 +428,7 @@ export default function ScheduleDetailClient({
             }
             .stats-container {
               display: flex;
-              justify-content: space-between;
+              justify-content: center;
               margin-bottom: 20px;
               flex-wrap: wrap;
             }
@@ -415,7 +437,7 @@ export default function ScheduleDetailClient({
               border: 1px solid hsl(0 0% 90%);
               border-radius: 6px;
               padding: 15px;
-              width: calc(25% - 15px);
+              width: 250px;
               box-sizing: border-box;
               text-align: center;
               margin-bottom: 10px;
@@ -471,25 +493,18 @@ export default function ScheduleDetailClient({
           </style>
         </head>
         <body>
+          <div class="print-header">
+            <div>${currentDateTime}</div>
+            <div>Detalles de Viaje - ${routeDisplay}</div>
+          </div>
+          
           <div class="header">
             <p class="company-name">FLOTA IMPERIAL POTOSI</p>
             <h1 class="document-title">DETALLES DEL VIAJE</h1>
-            <p>${routeDisplay} - ${departureDate}</p>
+            <p class="route-info">${routeDisplay} - ${departureDate}</p>
           </div>
           
           <div class="stats-container">
-            <div class="stat-box">
-              <p class="stat-value">${soldTickets || 0}</p>
-              <p class="stat-label">Asientos Ocupados</p>
-            </div>
-            <div class="stat-box">
-              <p class="stat-value">${emptySeats || 0}</p>
-              <p class="stat-label">Asientos Vacíos</p>
-            </div>
-            <div class="stat-box">
-              <p class="stat-value">${occupancyRate || 0}%</p>
-              <p class="stat-label">Tasa de Ocupación</p>
-            </div>
             <div class="stat-box">
               <p class="stat-value">
                 <span class="badge ${
@@ -513,34 +528,52 @@ export default function ScheduleDetailClient({
           <div class="section-title">Información General</div>
           <div class="info-grid">
             <div class="info-item">
-              <span class="info-label">Ruta:</span> ${routeName}
+              <span class="info-label">Ruta:</span>
+              <span class="info-value">${routeName}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Fecha:</span> ${departureDate}
+              <span class="info-label">Fecha:</span>
+              <span class="info-value">${departureDate}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Hora de Salida:</span> ${departureTime}
+              <span class="info-label">Hora de Salida:</span>
+              <span class="info-value">${departureTime}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Llegada Estimada:</span> ${arrivalTime}
+              <span class="info-label">Llegada Estimada:</span>
+              <span class="info-value">${arrivalTime}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Bus:</span> ${schedule.bus?.plateNumber || "No asignado"}
+              <span class="info-label">Bus:</span>
+              <span class="info-value">${busPlateNumber}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Capacidad:</span> ${totalSeats} pasajeros
+              <span class="info-label">Total de Pasajeros:</span>
+              <span class="info-value">${totalPasajeros}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Conductor Principal:</span> ${schedule.primaryDriver?.fullName || "No asignado"}
+              <span class="info-label">Conductor Principal:</span>
+              <span class="info-value">${conductorPrincipal}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Conductor Secundario:</span> ${schedule.secondaryDriver?.fullName || "No asignado"}
+              <span class="info-label">Licencia:</span>
+              <span class="info-value">${licenciaPrincipal} (${categoriaPrincipal})</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Origen:</span> ${origin}
+              <span class="info-label">Conductor Secundario:</span>
+              <span class="info-value">${conductorSecundario}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">Destino:</span> ${destination}
+              <span class="info-label">Licencia:</span>
+              <span class="info-value">${licenciaSecundaria} (${categoriaSecundaria})</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Origen:</span>
+              <span class="info-value">${origin}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Destino:</span>
+              <span class="info-value">${destination}</span>
             </div>
           </div>
           
