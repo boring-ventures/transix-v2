@@ -20,6 +20,9 @@ COPY . .
 # Uncomment the following line to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# Generate Prisma client before building
+RUN npx prisma generate
+
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -49,4 +52,4 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["node", "server.js"] 
+CMD ["node", "server.js"]

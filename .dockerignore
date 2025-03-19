@@ -42,4 +42,7 @@ docker-compose.yml
 # Misc
 README.md
 LICENSE
-*.md 
+*.md
+
+# Keep Prisma files
+!prisma/ 
