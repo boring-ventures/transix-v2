@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { Prisma} from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 // Get all buses with optional filtering
 export async function GET(req: Request) {
   try {
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
         seats: templateMatrix.firstFloor.seats.map((seat: Seat) => ({
           ...seat,
           floor: "first",
-          status: "available", // Ensure all seats start as available
+          status: "available",
         })),
       },
     };
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
         seats: templateMatrix.secondFloor.seats.map((seat: Seat) => ({
           ...seat,
           floor: "second",
-          status: "available", // Ensure all seats start as available
+          status: "available",
         })),
       };
     }
@@ -188,9 +188,6 @@ export async function POST(req: Request) {
           tierId: seat.tierId,
           status: "available",
           isActive: true,
-          floor: "first",
-          row: seat.row,
-          column: seat.column,
         }));
 
       allSeats.push(...firstFloorSeats);
@@ -206,9 +203,6 @@ export async function POST(req: Request) {
           tierId: seat.tierId,
           status: "available",
           isActive: true,
-          floor: "second",
-          row: seat.row,
-          column: seat.column,
         }));
 
       allSeats.push(...secondFloorSeats);
@@ -232,4 +226,4 @@ export async function POST(req: Request) {
     console.error("Error creating bus:", error);
     return NextResponse.json({ error: "Error creating bus" }, { status: 500 });
   }
-} 
+}

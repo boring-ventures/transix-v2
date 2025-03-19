@@ -49,7 +49,7 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Tickets",
-          url: "/dashboard/tickets",
+          url: "/tickets",
           icon: Ticket,
           requiredRole: [
             Role.superadmin,
@@ -60,7 +60,7 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: "Vender Tickets",
-              url: "/dashboard/tickets/sales",
+              url: "/tickets/sales",
               icon: ShoppingCart,
               requiredRole: [
                 Role.superadmin,
@@ -71,7 +71,7 @@ export const sidebarData: SidebarData = {
             },
             {
               title: "Reportes de Ventas",
-              url: "/dashboard/tickets/reports",
+              url: "/tickets/reports",
               icon: BarChart,
               requiredRole: [
                 Role.superadmin,
@@ -84,7 +84,7 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Viajes",
-          url: "/dashboard/schedules",
+          url: "/schedules",
           icon: Bus,
           requiredRole: [
             Role.superadmin,
@@ -95,7 +95,7 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: "Lista de Viajes",
-              url: "/dashboard/schedules",
+              url: "/schedules",
               icon: List,
               requiredRole: [
                 Role.superadmin,
@@ -108,19 +108,19 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Rutas",
-          url: "/dashboard/routes",
+          url: "/routes",
           icon: MapIcon,
           requiredRole: [Role.superadmin, Role.company_admin],
           items: [
             {
               title: "Lista de Rutas",
-              url: "/dashboard/routes/list",
+              url: "/routes/list",
               icon: Route,
               requiredRole: [Role.superadmin, Role.company_admin],
             },
             {
               title: "Ubicaciones",
-              url: "/dashboard/locations",
+              url: "/locations",
               icon: MapPin,
               requiredRole: [
                 Role.superadmin,
@@ -133,19 +133,19 @@ export const sidebarData: SidebarData = {
 
         {
           title: "Buses",
-          url: "/dashboard/buses",
+          url: "/buses",
           icon: BusFront,
           requiredRole: [Role.superadmin, Role.company_admin],
           items: [
             {
               title: "Lista de Buses",
-              url: "/dashboard/buses",
+              url: "/buses",
               icon: List,
               requiredRole: [Role.superadmin, Role.company_admin],
             },
             {
               title: "Plantillas",
-              url: "/dashboard/bus-templates",
+              url: "/bus-templates",
               icon: FileSpreadsheet,
               requiredRole: [Role.superadmin, Role.company_admin],
             },
@@ -153,25 +153,25 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Conductores",
-          url: "/dashboard/drivers",
+          url: "/drivers",
           icon: User,
           requiredRole: [Role.superadmin, Role.company_admin],
         },
         {
           title: "Usuarios",
-          url: "/dashboard/profiles",
+          url: "/profiles",
           icon: Users,
           requiredRole: [Role.superadmin, Role.company_admin],
         },
         {
           title: "Empresas",
-          url: "/dashboard/companies",
+          url: "/companies",
           icon: Building,
           requiredRole: [Role.superadmin],
         },
         {
           title: "Finanzas",
-          url: "/dashboard/finances",
+          url: "/finances",
           icon: CreditCard,
           requiredRole: [Role.superadmin, Role.company_admin],
         },
