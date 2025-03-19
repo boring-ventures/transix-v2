@@ -1,11 +1,22 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 import { withRoleProtection } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
-async function getExpenseCategories() {
+// Get expense categories with optional filters
+async function getExpenseCategories(req: NextRequest) {
   try {
-    // Query all expense categories
+    const { searchParams } = new URL(req.url);
+    const active = searchParams.get("active");
+
+    // Build where clause
+    const where: any = {};
+    if (active !== null) {
+      where.active = active === "true";
+    }
+
+    // Query for expense categories
     const categories = await prisma.expenseCategory.findMany({
+      where,
       orderBy: {
         name: "asc",
       },
@@ -21,19 +32,41 @@ async function getExpenseCategories() {
   }
 }
 
-async function createExpenseCategory(request: Request) {
+// Create a new expense category
+async function createExpenseCategory(req: NextRequest) {
   try {
-    const data = await request.json();
+    const body = await req.json();
+    const { name, description, isActive = true } = body;
 
-    // Create new expense category
-    const newCategory = await prisma.expenseCategory.create({
-      data: {
-        name: data.name,
-        description: data.description || "",
+    // Validate required fields
+    if (!name) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+
+    // Check if a category with the same name already exists
+    const existingCategory = await prisma.expenseCategory.findFirst({
+      where: {
+        name: {
+          equals: name,
+          mode: "insensitive", // Case insensitive
+        },
       },
     });
 
-    return NextResponse.json(newCategory, { status: 201 });
+    if (existingCategory) {
+      return NextResponse.json(existingCategory);
+    }
+
+    // Create the category
+    const category = await prisma.expenseCategory.create({
+      data: {
+        name,
+        description: description || "",
+        active: isActive,
+      },
+    });
+
+    return NextResponse.json(category, { status: 201 });
   } catch (error) {
     console.error("Error creating expense category:", error);
     return NextResponse.json(
@@ -43,6 +76,7 @@ async function createExpenseCategory(request: Request) {
   }
 }
 
+// Export the protected handlers
 export const GET = withRoleProtection(getExpenseCategories, [
   "superadmin",
   "company_admin",
@@ -52,4 +86,5 @@ export const GET = withRoleProtection(getExpenseCategories, [
 export const POST = withRoleProtection(createExpenseCategory, [
   "superadmin",
   "company_admin",
+  "branch_admin",
 ]);

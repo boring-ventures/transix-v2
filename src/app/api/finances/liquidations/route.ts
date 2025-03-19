@@ -1,90 +1,136 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { createLiquidation } from "@/lib/finances";
+import { NextRequest, NextResponse } from "next/server";
 import { withRoleProtection } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
-async function getLiquidations(request: Request) {
+async function getLiquidations(req: NextRequest) {
   try {
-    // Get URL parameters
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(req.url);
+
+    // Parse filters
     const status = searchParams.get("status");
-    const search = searchParams.get("search");
-    const sortBy = searchParams.get("sortBy") || "liquidationDate";
+    const sortBy = searchParams.get("sortBy") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const skip = (page - 1) * limit;
 
-    // Build the where clause
+    // Build where clause
     const where: any = {};
-
     if (status && status !== "all") {
-      where.status = status.toUpperCase();
+      where.status = status;
     }
 
-    if (search) {
-      where.OR = [
-        {
-          trip: { route: { name: { contains: search, mode: "insensitive" } } },
-        },
-        {
-          trip: {
-            bus: { plateNumber: { contains: search, mode: "insensitive" } },
-          },
-        },
-        {
-          trip: { driver: { name: { contains: search, mode: "insensitive" } } },
-        },
-      ];
+    // Map frontend sort fields to database fields
+    let dbSortBy = sortBy;
+    if (sortBy === "liquidationDate") {
+      dbSortBy = "createdAt";
     }
 
-    // Query the liquidations
+    // For now, we'll sort only by simple fields as complex relation sorting requires more work
+    const orderBy: any = {
+      [dbSortBy]: sortOrder,
+    };
+
+    // Query for liquidations with related data
     const liquidations = await prisma.tripLiquidation.findMany({
+      skip,
+      take: limit,
       where,
+      orderBy,
       include: {
         trip: {
           include: {
-            route: true,
+            route: {
+              include: {
+                origin: true,
+                destination: true,
+              },
+            },
             bus: true,
             driver: true,
-            tickets: true,
-            expenses: true,
+            tickets: {
+              where: {
+                status: "active",
+              },
+              select: {
+                price: true,
+              },
+            },
+            expenses: {
+              select: {
+                amount: true,
+                category: true,
+              },
+            },
           },
         },
       },
-      orderBy: {
-        [sortBy]: sortOrder,
-      },
     });
 
-    // Process liquidations to include all required information
-    const processedLiquidations = liquidations.map((liquidation) => {
+    // Count total for pagination
+    const total = await prisma.tripLiquidation.count({ where });
+
+    // Format data for response
+    const formattedLiquidations = liquidations.map((liquidation) => {
       const totalIncome = liquidation.trip.tickets.reduce(
-        (sum, ticket) => sum + (ticket.price || 0),
+        (sum, ticket) =>
+          sum +
+          (typeof ticket.price === "object"
+            ? ticket.price.toNumber()
+            : Number(ticket.price)),
         0
       );
+
       const totalExpenses = liquidation.trip.expenses.reduce(
-        (sum, expense) => sum + (expense.amount || 0),
+        (sum, expense) =>
+          sum +
+          (typeof expense.amount === "object"
+            ? expense.amount.toNumber()
+            : Number(expense.amount)),
         0
       );
+
+      // Create origin and destination codes from the first 3 letters
+      const originCode = liquidation.trip.route.origin.name
+        .substring(0, 3)
+        .toUpperCase();
+      const destinationCode = liquidation.trip.route.destination.name
+        .substring(0, 3)
+        .toUpperCase();
 
       return {
         id: liquidation.id,
-        tripSettlementId: liquidation.tripId,
-        ownerId: liquidation.trip.bus.ownerId,
-        ownerName: liquidation.trip.driver.name, // Using driver name as owner for now
+        tripId: liquidation.tripId,
+        status: liquidation.status,
+        isPrinted: liquidation.isPrinted,
+        notes: liquidation.notes,
+        createdAt: liquidation.createdAt,
+        updatedAt: liquidation.updatedAt,
+        createdBy: liquidation.createdBy,
         liquidationDate: liquidation.createdAt,
-        routeName: `${liquidation.trip.route.originCode}-${liquidation.trip.route.destinationCode}`,
-        plateNumber: liquidation.trip.bus.plateNumber,
-        busType: liquidation.trip.bus.model,
+        route: `${originCode}-${destinationCode}`,
+        routeName: `${liquidation.trip.route.origin.name} - ${liquidation.trip.route.destination.name}`,
         departureTime: liquidation.trip.departureTime,
-        totalPassengers: liquidation.trip.tickets.length,
+        driver: liquidation.trip.driver?.fullName || "No asignado",
+        ownerName: liquidation.trip.driver?.fullName || "No asignado",
+        busPlate: liquidation.trip.bus?.plateNumber || "No asignado",
+        plateNumber: liquidation.trip.bus?.plateNumber || "No asignado",
+        busType: liquidation.trip.bus?.template?.name || "No asignado",
         totalIncome,
         totalExpenses,
         netAmount: totalIncome - totalExpenses,
-        status: liquidation.status.toLowerCase(),
-        isPrinted: liquidation.isPrinted,
       };
     });
 
-    return NextResponse.json(processedLiquidations);
+    return NextResponse.json({
+      data: formattedLiquidations,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching liquidations:", error);
     return NextResponse.json(
@@ -94,26 +140,51 @@ async function getLiquidations(request: Request) {
   }
 }
 
-async function createNewLiquidation(request: Request) {
+async function createLiquidation(req: NextRequest) {
   try {
-    const data = await request.json();
+    const body = await req.json();
+    const { tripId, notes, createdBy } = body;
 
-    // Get the authenticated user from the request context (handled by withRoleProtection)
-    const session = request.headers.get("x-user-session");
-    const userId = session ? JSON.parse(session).user.id : null;
+    if (!tripId) {
+      return NextResponse.json(
+        { error: "Trip ID is required" },
+        { status: 400 }
+      );
+    }
 
-    if (!userId) {
-      return NextResponse.json({ error: "User ID not found" }, { status: 401 });
+    // Check if trip exists
+    const trip = await prisma.trip.findUnique({
+      where: { id: tripId },
+    });
+
+    if (!trip) {
+      return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    }
+
+    // Check if liquidation already exists for this trip
+    const existingLiquidation = await prisma.tripLiquidation.findUnique({
+      where: { tripId },
+    });
+
+    if (existingLiquidation) {
+      return NextResponse.json(
+        { error: "Liquidation already exists for this trip" },
+        { status: 409 }
+      );
     }
 
     // Create new liquidation
-    const newLiquidation = await createLiquidation(
-      data.tripId,
-      userId,
-      data.notes
-    );
+    const liquidation = await prisma.tripLiquidation.create({
+      data: {
+        tripId,
+        status: "pending",
+        isPrinted: false,
+        notes: notes || "",
+        createdBy,
+      },
+    });
 
-    return NextResponse.json(newLiquidation, { status: 201 });
+    return NextResponse.json(liquidation, { status: 201 });
   } catch (error) {
     console.error("Error creating liquidation:", error);
     return NextResponse.json(
@@ -123,13 +194,14 @@ async function createNewLiquidation(request: Request) {
   }
 }
 
+// Export the protected handlers
 export const GET = withRoleProtection(getLiquidations, [
   "superadmin",
   "company_admin",
   "branch_admin",
 ]);
 
-export const POST = withRoleProtection(createNewLiquidation, [
+export const POST = withRoleProtection(createLiquidation, [
   "superadmin",
   "company_admin",
   "branch_admin",

@@ -1,256 +1,305 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 import { withRoleProtection } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
+import { Decimal } from "@prisma/client/runtime/library";
 
-async function getFinancialReport(request: Request) {
+async function getFinancialReports(req: NextRequest) {
   try {
-    // Get URL parameters
-    const { searchParams } = new URL(request.url);
-    const reportType = searchParams.get("type") || "income";
+    const { searchParams } = new URL(req.url);
+
+    // Parse report parameters
+    const reportType = searchParams.get("type") || "general"; // general, route, bus, driver
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const routeId = searchParams.get("routeId");
     const busId = searchParams.get("busId");
     const driverId = searchParams.get("driverId");
+    const groupBy = searchParams.get("groupBy") || "day"; // day, week, month
 
-    // Build date filter
-    const dateFilter: any = {};
+    // Build date range filter
+    const dateRange: any = {};
     if (startDate) {
-      dateFilter.gte = new Date(startDate);
+      dateRange.gte = new Date(startDate);
     }
     if (endDate) {
-      dateFilter.lte = new Date(endDate);
+      dateRange.lte = new Date(endDate);
     }
 
-    // Build trip filter
-    const tripFilter: any = {};
-    if (Object.keys(dateFilter).length > 0) {
-      tripFilter.departureTime = dateFilter;
+    // Build the where clause
+    const where: any = {};
+    if (Object.keys(dateRange).length > 0) {
+      where.departureTime = dateRange;
     }
     if (routeId) {
-      tripFilter.routeId = routeId;
+      where.routeId = routeId;
     }
     if (busId) {
-      tripFilter.busId = busId;
+      where.busId = busId;
     }
     if (driverId) {
-      tripFilter.driverId = driverId;
+      where.driverId = driverId;
     }
 
-    let result;
-
-    if (reportType === "income") {
-      // Income report
-      const tickets = await prisma.ticket.findMany({
-        where: {
-          trip: tripFilter,
-          status: "active",
-        },
-        include: {
-          trip: {
-            include: {
-              route: true,
-            },
+    // Base query with common fields
+    let trips = await prisma.trip.findMany({
+      where,
+      include: {
+        route: {
+          select: {
+            id: true,
+            originCode: true,
+            originName: true,
+            destinationCode: true,
+            destinationName: true,
           },
         },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-      // Group tickets by date and route
-      const groupedData = tickets.reduce(
-        (acc, ticket) => {
-          const date = new Date(ticket.trip.departureTime)
-            .toISOString()
-            .split("T")[0];
-          const routeName = ticket.trip.route.name;
-          const price =
-            typeof ticket.price === "object" &&
-            ticket.price !== null &&
-            "toNumber" in ticket.price
-              ? ticket.price.toNumber()
-              : Number(ticket.price || 0);
-
-          if (!acc.byDate[date]) {
-            acc.byDate[date] = 0;
-          }
-          acc.byDate[date] += price;
-
-          if (!acc.byRoute[routeName]) {
-            acc.byRoute[routeName] = 0;
-          }
-          acc.byRoute[routeName] += price;
-
-          acc.total += price;
-
-          return acc;
-        },
-        { total: 0, byDate: {}, byRoute: {} }
-      );
-
-      result = {
-        reportType: "income",
-        data: groupedData,
-        rawData: tickets,
-      };
-    } else if (reportType === "expenses") {
-      // Expenses report
-      const expenses = await prisma.tripExpense.findMany({
-        where: {
-          trip: tripFilter,
-        },
-        include: {
-          category: true,
-          trip: {
-            include: {
-              route: true,
-            },
+        bus: {
+          select: {
+            id: true,
+            plate: true,
+            model: true,
           },
         },
-        orderBy: {
-          createdAt: "desc",
+        driver: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
-      });
-
-      // Group expenses by category and date
-      const groupedData = expenses.reduce(
-        (acc, expense) => {
-          const date = new Date(expense.createdAt).toISOString().split("T")[0];
-          const categoryName = expense.category?.name || "Uncategorized";
-          const amount =
-            typeof expense.amount === "object" &&
-            expense.amount !== null &&
-            "toNumber" in expense.amount
-              ? expense.amount.toNumber()
-              : Number(expense.amount || 0);
-
-          if (!acc.byCategory[categoryName]) {
-            acc.byCategory[categoryName] = 0;
-          }
-          acc.byCategory[categoryName] += amount;
-
-          if (!acc.byDate[date]) {
-            acc.byDate[date] = 0;
-          }
-          acc.byDate[date] += amount;
-
-          acc.total += amount;
-
-          return acc;
-        },
-        { total: 0, byCategory: {}, byDate: {} }
-      );
-
-      result = {
-        reportType: "expenses",
-        data: groupedData,
-        rawData: expenses,
-      };
-    } else if (reportType === "profitability") {
-      // Profitability report - both income and expenses
-      const [tickets, expenses] = await Promise.all([
-        prisma.ticket.findMany({
+        tickets: {
           where: {
-            trip: tripFilter,
             status: "active",
           },
-          include: {
-            trip: {
-              include: {
-                route: true,
-              },
-            },
-          },
-        }),
-        prisma.tripExpense.findMany({
-          where: {
-            trip: tripFilter,
-          },
-          include: {
-            trip: {
-              include: {
-                route: true,
-              },
-            },
-          },
-        }),
-      ]);
-
-      // Group by route
-      const routeData = {};
-
-      // Add income by route
-      tickets.forEach((ticket) => {
-        const routeName = ticket.trip.route.name;
-        const price =
-          typeof ticket.price === "object" &&
-          ticket.price !== null &&
-          "toNumber" in ticket.price
-            ? ticket.price.toNumber()
-            : Number(ticket.price || 0);
-
-        if (!routeData[routeName]) {
-          routeData[routeName] = { income: 0, expenses: 0, profit: 0 };
-        }
-        routeData[routeName].income += price;
-        routeData[routeName].profit =
-          routeData[routeName].income - routeData[routeName].expenses;
-      });
-
-      // Add expenses by route
-      expenses.forEach((expense) => {
-        const routeName = expense.trip.route.name;
-        const amount =
-          typeof expense.amount === "object" &&
-          expense.amount !== null &&
-          "toNumber" in expense.amount
-            ? expense.amount.toNumber()
-            : Number(expense.amount || 0);
-
-        if (!routeData[routeName]) {
-          routeData[routeName] = { income: 0, expenses: 0, profit: 0 };
-        }
-        routeData[routeName].expenses += amount;
-        routeData[routeName].profit =
-          routeData[routeName].income - routeData[routeName].expenses;
-      });
-
-      // Calculate totals
-      const totalIncome = tickets.reduce((sum, ticket) => {
-        const price =
-          typeof ticket.price === "object" &&
-          ticket.price !== null &&
-          "toNumber" in ticket.price
-            ? ticket.price.toNumber()
-            : Number(ticket.price || 0);
-        return sum + price;
-      }, 0);
-
-      const totalExpenses = expenses.reduce((sum, expense) => {
-        const amount =
-          typeof expense.amount === "object" &&
-          expense.amount !== null &&
-          "toNumber" in expense.amount
-            ? expense.amount.toNumber()
-            : Number(expense.amount || 0);
-        return sum + amount;
-      }, 0);
-
-      result = {
-        reportType: "profitability",
-        data: {
-          byRoute: routeData,
-          total: {
-            income: totalIncome,
-            expenses: totalExpenses,
-            profit: totalIncome - totalExpenses,
+          select: {
+            price: true,
           },
         },
+        expenses: {
+          select: {
+            amount: true,
+            category: true,
+          },
+        },
+        liquidation: {
+          select: {
+            status: true,
+          },
+        },
+      },
+      orderBy: {
+        departureTime: "desc",
+      },
+    });
+
+    // Calculate financial metrics for each trip
+    const processedTrips = trips.map((trip) => {
+      const totalIncome = trip.tickets.reduce(
+        (sum, ticket) => sum + ticket.price,
+        new Decimal(0)
+      );
+
+      const totalExpenses = trip.expenses.reduce(
+        (sum, expense) => sum + expense.amount,
+        new Decimal(0)
+      );
+
+      const netAmount = totalIncome.minus(totalExpenses);
+
+      return {
+        id: trip.id,
+        departureTime: trip.departureTime,
+        route: {
+          id: trip.route.id,
+          code: `${trip.route.originCode}-${trip.route.destinationCode}`,
+          name: `${trip.route.originName} - ${trip.route.destinationName}`,
+        },
+        bus: trip.bus
+          ? {
+              id: trip.bus.id,
+              plate: trip.bus.plate,
+              model: trip.bus.model,
+            }
+          : null,
+        driver: trip.driver
+          ? {
+              id: trip.driver.id,
+              name: trip.driver.name,
+            }
+          : null,
+        ticketsCount: trip.tickets.length,
+        status: trip.liquidation?.status || "pending",
+        totalIncome: totalIncome.toNumber(),
+        totalExpenses: totalExpenses.toNumber(),
+        netAmount: netAmount.toNumber(),
       };
+    });
+
+    // Generate summary statistics
+    const totalIncome = processedTrips.reduce(
+      (sum, trip) => sum + trip.totalIncome,
+      0
+    );
+
+    const totalExpenses = processedTrips.reduce(
+      (sum, trip) => sum + trip.totalExpenses,
+      0
+    );
+
+    const netAmount = totalIncome - totalExpenses;
+
+    const totalTrips = processedTrips.length;
+
+    // Generate aggregated data based on report type
+    let aggregatedData: any[] = [];
+
+    switch (reportType) {
+      case "route":
+        // Group by route
+        const routeMap = new Map();
+
+        processedTrips.forEach((trip) => {
+          const routeId = trip.route.id;
+          if (!routeMap.has(routeId)) {
+            routeMap.set(routeId, {
+              routeId,
+              routeCode: trip.route.code,
+              routeName: trip.route.name,
+              tripsCount: 0,
+              totalIncome: 0,
+              totalExpenses: 0,
+              netAmount: 0,
+            });
+          }
+
+          const routeData = routeMap.get(routeId);
+          routeData.tripsCount += 1;
+          routeData.totalIncome += trip.totalIncome;
+          routeData.totalExpenses += trip.totalExpenses;
+          routeData.netAmount += trip.netAmount;
+        });
+
+        aggregatedData = Array.from(routeMap.values());
+        break;
+
+      case "bus":
+        // Group by bus
+        const busMap = new Map();
+
+        processedTrips.forEach((trip) => {
+          if (!trip.bus) return;
+
+          const busId = trip.bus.id;
+          if (!busMap.has(busId)) {
+            busMap.set(busId, {
+              busId,
+              plate: trip.bus.plate,
+              model: trip.bus.model,
+              tripsCount: 0,
+              totalIncome: 0,
+              totalExpenses: 0,
+              netAmount: 0,
+            });
+          }
+
+          const busData = busMap.get(busId);
+          busData.tripsCount += 1;
+          busData.totalIncome += trip.totalIncome;
+          busData.totalExpenses += trip.totalExpenses;
+          busData.netAmount += trip.netAmount;
+        });
+
+        aggregatedData = Array.from(busMap.values());
+        break;
+
+      case "driver":
+        // Group by driver
+        const driverMap = new Map();
+
+        processedTrips.forEach((trip) => {
+          if (!trip.driver) return;
+
+          const driverId = trip.driver.id;
+          if (!driverMap.has(driverId)) {
+            driverMap.set(driverId, {
+              driverId,
+              driverName: trip.driver.name,
+              tripsCount: 0,
+              totalIncome: 0,
+              totalExpenses: 0,
+              netAmount: 0,
+            });
+          }
+
+          const driverData = driverMap.get(driverId);
+          driverData.tripsCount += 1;
+          driverData.totalIncome += trip.totalIncome;
+          driverData.totalExpenses += trip.totalExpenses;
+          driverData.netAmount += trip.netAmount;
+        });
+
+        aggregatedData = Array.from(driverMap.values());
+        break;
+
+      case "time":
+        // Group by time period
+        const timeMap = new Map();
+
+        processedTrips.forEach((trip) => {
+          let timeKey;
+          const date = new Date(trip.departureTime);
+
+          if (groupBy === "day") {
+            timeKey = date.toISOString().split("T")[0]; // YYYY-MM-DD
+          } else if (groupBy === "week") {
+            // Get week start date (Sunday)
+            const day = date.getDay();
+            const diff = date.getDate() - day;
+            const weekStart = new Date(date);
+            weekStart.setDate(diff);
+            timeKey = weekStart.toISOString().split("T")[0];
+          } else if (groupBy === "month") {
+            timeKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+          }
+
+          if (!timeMap.has(timeKey)) {
+            timeMap.set(timeKey, {
+              timePeriod: timeKey,
+              periodType: groupBy,
+              tripsCount: 0,
+              totalIncome: 0,
+              totalExpenses: 0,
+              netAmount: 0,
+            });
+          }
+
+          const timeData = timeMap.get(timeKey);
+          timeData.tripsCount += 1;
+          timeData.totalIncome += trip.totalIncome;
+          timeData.totalExpenses += trip.totalExpenses;
+          timeData.netAmount += trip.netAmount;
+        });
+
+        aggregatedData = Array.from(timeMap.values()).sort((a, b) => {
+          return a.timePeriod.localeCompare(b.timePeriod);
+        });
+        break;
+
+      default:
+        // Use processedTrips directly for general report
+        aggregatedData = processedTrips;
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      summary: {
+        totalTrips,
+        totalIncome,
+        totalExpenses,
+        netAmount,
+        periodStart: startDate ? new Date(startDate) : null,
+        periodEnd: endDate ? new Date(endDate) : null,
+      },
+      data: aggregatedData,
+    });
   } catch (error) {
     console.error("Error generating financial report:", error);
     return NextResponse.json(
@@ -260,7 +309,8 @@ async function getFinancialReport(request: Request) {
   }
 }
 
-export const GET = withRoleProtection(getFinancialReport, [
+// Export the protected handler
+export const GET = withRoleProtection(getFinancialReports, [
   "superadmin",
   "company_admin",
   "branch_admin",

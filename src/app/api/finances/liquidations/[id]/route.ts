@@ -1,34 +1,51 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { updateLiquidationStatus } from "@/lib/finances";
+import { NextRequest, NextResponse } from "next/server";
 import { withRoleProtection } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
+// Get a single liquidation with related data
 async function getLiquidation(
-  request: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = params.id;
+    const { id } = params;
 
     const liquidation = await prisma.tripLiquidation.findUnique({
       where: { id },
       include: {
         trip: {
           include: {
-            route: true,
+            route: {
+              include: {
+                origin: true,
+                destination: true,
+              },
+            },
             bus: true,
             driver: true,
             tickets: {
-              include: {
-                customer: true,
-                seat: true,
+              where: {
+                status: "active",
+              },
+              select: {
+                id: true,
+                busSeatId: true,
+                price: true,
+                customer: {
+                  select: {
+                    fullName: true,
+                    documentId: true,
+                  },
+                },
+                createdAt: true,
               },
             },
-            expenses: {
-              include: {
-                category: true,
-              },
-            },
+          },
+        },
+        // Get expenses specifically for this trip
+        expenses: {
+          include: {
+            category: true,
           },
         },
       },
@@ -43,74 +60,109 @@ async function getLiquidation(
 
     // Calculate totals
     const totalIncome = liquidation.trip.tickets.reduce(
-      (sum, ticket) => sum + (ticket.price || 0),
-      0
-    );
-    const totalExpenses = liquidation.trip.expenses.reduce(
-      (sum, expense) => sum + (expense.amount || 0),
+      (sum, ticket) =>
+        sum +
+        (typeof ticket.price === "object"
+          ? ticket.price.toNumber()
+          : Number(ticket.price)),
       0
     );
 
-    // Group expenses by category
-    const expensesByCategory = liquidation.trip.expenses.reduce(
-      (acc, expense) => {
-        const categoryName = expense.category?.name || "Uncategorized";
-        if (!acc[categoryName]) {
-          acc[categoryName] = 0;
-        }
-        acc[categoryName] += expense.amount;
-        return acc;
-      },
-      {} as Record<string, number>
+    const totalExpenses = liquidation.expenses.reduce(
+      (sum, expense) =>
+        sum +
+        (typeof expense.amount === "object"
+          ? expense.amount.toNumber()
+          : Number(expense.amount)),
+      0
     );
 
-    // Format response data
-    const formattedLiquidation = {
+    // Format the expenses to include category name
+    const formattedExpenses = liquidation.expenses.map((expense) => ({
+      id: expense.id,
+      description: expense.description,
+      amount:
+        typeof expense.amount === "object"
+          ? expense.amount.toNumber()
+          : Number(expense.amount),
+      categoryId: expense.categoryId,
+      categoryName: expense.category.name,
+      evidenceUrl: expense.evidenceUrl,
+      createdAt: expense.createdAt,
+      createdBy: expense.createdBy,
+    }));
+
+    // Format tickets
+    const formattedTickets = liquidation.trip.tickets.map((ticket) => ({
+      id: ticket.id,
+      seatNumber: ticket.busSeatId,
+      price:
+        typeof ticket.price === "object"
+          ? ticket.price.toNumber()
+          : Number(ticket.price),
+      passengerName: ticket.customer?.fullName || "Sin nombre",
+      passengerDocument: ticket.customer?.documentId || "Sin documento",
+      createdAt: ticket.createdAt,
+    }));
+
+    // Create origin and destination codes from the first 3 letters
+    const originCode = liquidation.trip.route.origin.name
+      .substring(0, 3)
+      .toUpperCase();
+    const destinationCode = liquidation.trip.route.destination.name
+      .substring(0, 3)
+      .toUpperCase();
+
+    const response = {
       id: liquidation.id,
       tripId: liquidation.tripId,
-      route: {
-        name: liquidation.trip.route.name,
-        origin: liquidation.trip.route.originCode,
-        destination: liquidation.trip.route.destinationCode,
-      },
-      bus: {
-        plateNumber: liquidation.trip.bus.plateNumber,
-        model: liquidation.trip.bus.model,
-        capacity: liquidation.trip.bus.capacity,
-      },
-      driver: {
-        name: liquidation.trip.driver.name,
-        phone: liquidation.trip.driver.phone,
-      },
-      departureTime: liquidation.trip.departureTime,
-      arrivalTime: liquidation.trip.arrivalTime,
-      tickets: liquidation.trip.tickets.map((ticket) => ({
-        id: ticket.id,
-        customerName: ticket.customer?.name || "Unknown",
-        customerPhone: ticket.customer?.phone || "",
-        seatNumber: ticket.seat?.number || "",
-        price: ticket.price,
-        status: ticket.status,
-      })),
-      expenses: liquidation.trip.expenses.map((expense) => ({
-        id: expense.id,
-        description: expense.description,
-        amount: expense.amount,
-        category: expense.category?.name || "Uncategorized",
-      })),
-      expensesByCategory,
-      totalPassengers: liquidation.trip.tickets.length,
-      totalIncome,
-      totalExpenses,
-      netAmount: totalIncome - totalExpenses,
       status: liquidation.status,
       isPrinted: liquidation.isPrinted,
       notes: liquidation.notes,
       createdAt: liquidation.createdAt,
       updatedAt: liquidation.updatedAt,
+      createdBy: liquidation.createdBy,
+      liquidationDate: liquidation.createdAt,
+      plateNumber: liquidation.trip.bus?.plateNumber || "No asignado",
+      busType: liquidation.trip.bus?.template?.name || "No asignado",
+      ownerName: liquidation.trip.driver?.fullName || "No asignado",
+      trip: {
+        id: liquidation.trip.id,
+        departureTime: liquidation.trip.departureTime,
+        route: {
+          id: liquidation.trip.route.id,
+          originCode,
+          originName: liquidation.trip.route.origin.name,
+          destinationCode,
+          destinationName: liquidation.trip.route.destination.name,
+          routeName: `${liquidation.trip.route.origin.name} - ${liquidation.trip.route.destination.name}`,
+          routeCode: `${originCode}-${destinationCode}`,
+        },
+        bus: liquidation.trip.bus
+          ? {
+              id: liquidation.trip.bus.id,
+              plate: liquidation.trip.bus.plateNumber,
+              model: liquidation.trip.bus.template?.name || "Standard",
+            }
+          : null,
+        driver: liquidation.trip.driver
+          ? {
+              id: liquidation.trip.driver.id,
+              name: liquidation.trip.driver.fullName,
+            }
+          : null,
+      },
+      tickets: formattedTickets,
+      expenses: formattedExpenses,
+      summary: {
+        totalIncome,
+        totalExpenses,
+        netAmount: totalIncome - totalExpenses,
+        totalTickets: formattedTickets.length,
+      },
     };
 
-    return NextResponse.json(formattedLiquidation);
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error fetching liquidation:", error);
     return NextResponse.json(
@@ -120,21 +172,38 @@ async function getLiquidation(
   }
 }
 
+// Update a liquidation
 async function updateLiquidation(
-  request: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = params.id;
-    const data = await request.json();
+    const { id } = params;
+    const body = await req.json();
+    const { status, isPrinted, notes } = body;
 
-    // Update liquidation status
-    const updatedLiquidation = await updateLiquidationStatus(
-      id,
-      data.status,
-      data.isPrinted,
-      data.notes
-    );
+    // Validate the liquidation exists
+    const existingLiquidation = await prisma.tripLiquidation.findUnique({
+      where: { id },
+    });
+
+    if (!existingLiquidation) {
+      return NextResponse.json(
+        { error: "Liquidation not found" },
+        { status: 404 }
+      );
+    }
+
+    // Update the liquidation
+    const updatedLiquidation = await prisma.tripLiquidation.update({
+      where: { id },
+      data: {
+        status: status || undefined,
+        isPrinted: isPrinted !== undefined ? isPrinted : undefined,
+        notes: notes !== undefined ? notes : undefined,
+        updatedAt: new Date(),
+      },
+    });
 
     return NextResponse.json(updatedLiquidation);
   } catch (error) {
@@ -146,6 +215,53 @@ async function updateLiquidation(
   }
 }
 
+// Delete a liquidation
+async function deleteLiquidation(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+
+    // Check if the liquidation exists
+    const liquidation = await prisma.tripLiquidation.findUnique({
+      where: { id },
+    });
+
+    if (!liquidation) {
+      return NextResponse.json(
+        { error: "Liquidation not found" },
+        { status: 404 }
+      );
+    }
+
+    // Only allow deletion of pending liquidations
+    if (liquidation.status !== "pending") {
+      return NextResponse.json(
+        { error: "Only pending liquidations can be deleted" },
+        { status: 400 }
+      );
+    }
+
+    // Delete the liquidation
+    await prisma.tripLiquidation.delete({
+      where: { id },
+    });
+
+    return NextResponse.json(
+      { message: "Liquidation deleted successfully" },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error deleting liquidation:", error);
+    return NextResponse.json(
+      { error: "Failed to delete liquidation" },
+      { status: 500 }
+    );
+  }
+}
+
+// Export the protected handlers
 export const GET = withRoleProtection(getLiquidation, [
   "superadmin",
   "company_admin",
@@ -153,6 +269,12 @@ export const GET = withRoleProtection(getLiquidation, [
 ]);
 
 export const PATCH = withRoleProtection(updateLiquidation, [
+  "superadmin",
+  "company_admin",
+  "branch_admin",
+]);
+
+export const DELETE = withRoleProtection(deleteLiquidation, [
   "superadmin",
   "company_admin",
   "branch_admin",

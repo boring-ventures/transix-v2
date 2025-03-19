@@ -133,10 +133,12 @@ model Schedule {
   secondaryDriverId    String?              @map("secondary_driver_id")
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @default(now()) @map("updated_at")
+  busLogs              BusLog[]
   assignments          BusAssignment[]
   occupancyLogs        OccupancyLog[]
   parcels              Parcel[]
   passengerLists       PassengerList[]
+  scheduleSeats        ScheduleSeat[]       @relation("ScheduleSeats")
   bus                  Bus?                 @relation(fields: [busId], references: [id])
   primaryDriver        Driver?              @relation("PrimaryDriver", fields: [primaryDriverId], references: [id])
   routeSchedule        RouteSchedule        @relation(fields: [routeScheduleId], references: [id])
@@ -145,8 +147,6 @@ model Schedule {
   oldReassignments     TicketReassignment[] @relation("OldSchedule")
   tickets              Ticket[]
   tripSettlements      TripSettlement[]
-  busLogs              BusLog[]
-  scheduleSeats        ScheduleSeat[]       @relation("ScheduleSeats")
 
   @@map("schedules")
 }
@@ -154,13 +154,13 @@ model Schedule {
 model BusLog {
   id         String   @id @default(uuid())
   scheduleId String
-  schedule   Schedule @relation(fields: [scheduleId], references: [id])
   type       String
   notes      String
   profileId  String
-  profile    Profile  @relation(fields: [profileId], references: [id])
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  profile    Profile  @relation(fields: [profileId], references: [id])
+  schedule   Schedule @relation(fields: [scheduleId], references: [id])
 
   @@index([scheduleId])
   @@index([profileId])
@@ -169,7 +169,6 @@ model BusLog {
 model Ticket {
   id            String               @id @default(uuid())
   scheduleId    String?              @map("schedule_id")
-  tripId        String?              @map("trip_id")
   customerId    String?              @map("customer_id")
   busSeatId     String               @map("bus_seat_id")
   status        TicketStatus         @default(active)
@@ -179,6 +178,7 @@ model Ticket {
   purchasedAt   DateTime             @default(now()) @map("purchased_at")
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @default(now()) @map("updated_at")
+  tripId        String?              @map("trip_id")
   paymentLines  PaymentLine[]
   cancellations TicketCancellation[]
   reassignments TicketReassignment[]
@@ -241,8 +241,8 @@ model BusSeat {
   updatedAt     DateTime       @default(now()) @map("updated_at")
   bus           Bus?           @relation(fields: [busId], references: [id])
   tier          SeatTier       @relation(fields: [tierId], references: [id])
-  tickets       Ticket[]
   scheduleSeats ScheduleSeat[] @relation("BusSeatSchedules")
+  tickets       Ticket[]
 
   @@map("bus_seats")
 }
@@ -268,9 +268,9 @@ model BusTypeTemplate {
 model Location {
   id                String   @id @default(uuid())
   name              String
-  active            Boolean  @default(true)
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @default(now()) @map("updated_at")
+  active            Boolean  @default(true)
   destinationRoutes Route[]  @relation("DestinationRoutes")
   originRoutes      Route[]  @relation("OriginRoutes")
 
@@ -428,23 +428,23 @@ model TripSettlement {
   settledAt         DateTime?        @map("settled_at")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @default(now()) @map("updated_at")
+  tripLiquidationId String?
+  expenses          TripExpense[]
   schedule          Schedule         @relation(fields: [scheduleId], references: [id])
   liquidation       TripLiquidation? @relation(fields: [tripLiquidationId], references: [id])
-  expenses          TripExpense[]
-  tripLiquidationId String?
 
   @@map("trip_settlements")
 }
 
 model TripLiquidation {
   id             String            @id @default(uuid())
-  tripId         String            @unique @map("trip_id")
-  notes          String?
-  status         LiquidationStatus @default(pending)
   isPrinted      Boolean           @default(false) @map("is_printed")
-  createdBy      String            @map("created_by")
+  status         LiquidationStatus @default(pending)
+  notes          String?
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @default(now()) @map("updated_at")
+  createdBy      String            @map("created_by")
+  tripId         String            @unique @map("trip_id")
   trip           Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
   TripSettlement TripSettlement[]
 
@@ -461,10 +461,10 @@ model TripExpense {
   createdBy        String          @map("created_by")
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @default(now()) @map("updated_at")
-  category         ExpenseCategory @relation(fields: [categoryId], references: [id])
-  trip             Trip            @relation(fields: [tripId], references: [id])
-  TripSettlement   TripSettlement? @relation(fields: [tripSettlementId], references: [id])
   tripSettlementId String?
+  category         ExpenseCategory @relation(fields: [categoryId], references: [id])
+  TripSettlement   TripSettlement? @relation(fields: [tripSettlementId], references: [id])
+  trip             Trip            @relation(fields: [tripId], references: [id])
 
   @@map("expenses")
 }
@@ -499,6 +499,40 @@ model Driver {
   Trip               Trip[]
 
   @@map("drivers")
+}
+
+model ScheduleSeat {
+  scheduleId String     @map("schedule_id")
+  busSeatId  String     @map("bus_seat_id")
+  status     SeatStatus @default(available)
+  isActive   Boolean    @default(true) @map("is_active")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @default(now()) @map("updated_at")
+  busSeat    BusSeat    @relation("BusSeatSchedules", fields: [busSeatId], references: [id])
+  schedule   Schedule   @relation("ScheduleSeats", fields: [scheduleId], references: [id])
+
+  @@id([scheduleId, busSeatId])
+  @@map("schedule_seats")
+}
+
+model Trip {
+  id            String           @id @default(uuid())
+  routeId       String           @map("route_id")
+  busId         String           @map("bus_id")
+  driverId      String           @map("driver_id")
+  departureTime DateTime         @map("departure_time")
+  arrivalTime   DateTime?        @map("arrival_time")
+  status        String           @default("scheduled")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @default(now()) @map("updated_at")
+  expenses      TripExpense[]
+  tickets       Ticket[]
+  liquidation   TripLiquidation?
+  bus           Bus              @relation(fields: [busId], references: [id])
+  driver        Driver           @relation(fields: [driverId], references: [id])
+  route         Route            @relation(fields: [routeId], references: [id])
+
+  @@map("trips")
 }
 
 enum BusAssignmentStatus {
@@ -572,8 +606,8 @@ enum PassengerStatus {
 
 enum SettlementStatus {
   pending
-  processing
   settled
+  processing
   disputed
 }
 
@@ -588,38 +622,4 @@ enum ExpenseStatus {
   pending
   approved
   rejected
-}
-
-model ScheduleSeat {
-  scheduleId String     @map("schedule_id")
-  busSeatId  String     @map("bus_seat_id")
-  status     SeatStatus @default(available)
-  isActive   Boolean    @default(true) @map("is_active")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @default(now()) @map("updated_at")
-  schedule   Schedule   @relation("ScheduleSeats", fields: [scheduleId], references: [id])
-  busSeat    BusSeat    @relation("BusSeatSchedules", fields: [busSeatId], references: [id])
-
-  @@id([scheduleId, busSeatId])
-  @@map("schedule_seats")
-}
-
-model Trip {
-  id            String           @id @default(uuid())
-  routeId       String           @map("route_id")
-  busId         String           @map("bus_id")
-  driverId      String           @map("driver_id")
-  departureTime DateTime         @map("departure_time")
-  arrivalTime   DateTime?        @map("arrival_time")
-  status        String           @default("scheduled")
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @default(now()) @map("updated_at")
-  route         Route            @relation(fields: [routeId], references: [id])
-  bus           Bus              @relation(fields: [busId], references: [id])
-  driver        Driver           @relation(fields: [driverId], references: [id])
-  tickets       Ticket[]
-  expenses      TripExpense[]
-  liquidation   TripLiquidation?
-
-  @@map("trips")
 }
