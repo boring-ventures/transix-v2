@@ -14,6 +14,7 @@ import {
   Route,
   BusFront,
   FileSpreadsheet,
+  BarChart,
 } from "lucide-react";
 import type { SidebarData } from "../types";
 import { Role } from "@prisma/client";
@@ -48,7 +49,7 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Tickets",
-          url: "/tickets",
+          url: "/dashboard/tickets",
           icon: Ticket,
           requiredRole: [
             Role.superadmin,
@@ -59,7 +60,7 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: "Vender Tickets",
-              url: "/tickets/sales",
+              url: "/dashboard/tickets/sales",
               icon: ShoppingCart,
               requiredRole: [
                 Role.superadmin,
@@ -69,9 +70,9 @@ export const sidebarData: SidebarData = {
               ],
             },
             {
-              title: "Lista de Tickets",
-              url: "/tickets/list",
-              icon: List,
+              title: "Reportes de Ventas",
+              url: "/dashboard/tickets/reports",
+              icon: BarChart,
               requiredRole: [
                 Role.superadmin,
                 Role.company_admin,
@@ -83,7 +84,7 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Viajes",
-          url: "/schedules",
+          url: "/dashboard/schedules",
           icon: Bus,
           requiredRole: [
             Role.superadmin,
@@ -94,7 +95,7 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: "Lista de Viajes",
-              url: "/schedules",
+              url: "/dashboard/schedules",
               icon: List,
               requiredRole: [
                 Role.superadmin,
@@ -107,19 +108,19 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Rutas",
-          url: "/routes",
+          url: "/dashboard/routes",
           icon: MapIcon,
           requiredRole: [Role.superadmin, Role.company_admin],
           items: [
             {
               title: "Lista de Rutas",
-              url: "/routes/list",
+              url: "/dashboard/routes/list",
               icon: Route,
               requiredRole: [Role.superadmin, Role.company_admin],
             },
             {
               title: "Ubicaciones",
-              url: "/locations",
+              url: "/dashboard/locations",
               icon: MapPin,
               requiredRole: [
                 Role.superadmin,
@@ -132,19 +133,19 @@ export const sidebarData: SidebarData = {
 
         {
           title: "Buses",
-          url: "/buses",
+          url: "/dashboard/buses",
           icon: BusFront,
           requiredRole: [Role.superadmin, Role.company_admin],
           items: [
             {
               title: "Lista de Buses",
-              url: "/buses",
+              url: "/dashboard/buses",
               icon: List,
               requiredRole: [Role.superadmin, Role.company_admin],
             },
             {
               title: "Plantillas",
-              url: "/bus-templates",
+              url: "/dashboard/bus-templates",
               icon: FileSpreadsheet,
               requiredRole: [Role.superadmin, Role.company_admin],
             },
@@ -152,25 +153,25 @@ export const sidebarData: SidebarData = {
         },
         {
           title: "Conductores",
-          url: "/drivers",
+          url: "/dashboard/drivers",
           icon: User,
           requiredRole: [Role.superadmin, Role.company_admin],
         },
         {
           title: "Usuarios",
-          url: "/profiles",
+          url: "/dashboard/profiles",
           icon: Users,
           requiredRole: [Role.superadmin, Role.company_admin],
         },
         {
           title: "Empresas",
-          url: "/companies",
+          url: "/dashboard/companies",
           icon: Building,
           requiredRole: [Role.superadmin],
         },
         {
           title: "Finanzas",
-          url: "/finances",
+          url: "/dashboard/finances",
           icon: CreditCard,
           requiredRole: [Role.superadmin, Role.company_admin],
         },
