@@ -87,7 +87,6 @@ async function getTripSettlements(req: NextRequest) {
               plateNumber: settlement.schedule.bus.plateNumber,
               templateId: settlement.schedule.bus.templateId,
               template: settlement.schedule.bus.template,
-              owner: settlement.schedule.bus.owner,
               companyId: settlement.schedule.bus.companyId,
             },
             null,

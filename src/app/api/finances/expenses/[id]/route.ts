@@ -14,16 +14,12 @@ async function getExpense(
       where: { id },
       include: {
         category: true,
-        schedule: {
+        trip: {
           include: {
-            routeSchedule: {
+            route: {
               include: {
-                route: {
-                  include: {
-                    origin: true,
-                    destination: true,
-                  },
-                },
+                origin: true,
+                destination: true,
               },
             },
           },
@@ -37,8 +33,8 @@ async function getExpense(
 
     // Format the response
     let routeInfo = null;
-    if (expense.schedule && expense.schedule.routeSchedule) {
-      const route = expense.schedule.routeSchedule.route;
+    if (expense.trip && expense.trip.route) {
+      const route = expense.trip.route;
       const originCode = route.origin.name.substring(0, 3).toUpperCase();
       const destinationCode = route.destination.name
         .substring(0, 3)
@@ -57,7 +53,7 @@ async function getExpense(
 
     const response = {
       id: expense.id,
-      scheduleId: expense.scheduleId,
+      tripId: expense.tripId,
       tripSettlementId: expense.tripSettlementId,
       categoryId: expense.categoryId,
       categoryName: expense.category.name,
@@ -70,10 +66,10 @@ async function getExpense(
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
       createdBy: expense.createdBy,
-      schedule: expense.schedule
+      trip: expense.trip
         ? {
-            id: expense.schedule.id,
-            departureTime: expense.schedule.departureDate,
+            id: expense.trip.id,
+            departureTime: expense.trip.departureTime,
             route: routeInfo,
           }
         : null,
@@ -139,7 +135,7 @@ async function updateExpense(
 
     return NextResponse.json({
       id: updatedExpense.id,
-      scheduleId: updatedExpense.scheduleId,
+      tripId: updatedExpense.tripId,
       tripSettlementId: updatedExpense.tripSettlementId,
       categoryId: updatedExpense.categoryId,
       categoryName: updatedExpense.category.name,

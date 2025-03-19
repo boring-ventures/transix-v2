@@ -254,14 +254,22 @@ async function createTrip(req: NextRequest) {
       }
     }
 
-    // Create the trip
-    const tripData = {
+    // Create the trip with required fields based on the Trip model
+    const tripData: {
+      routeId: string;
+      departureTime: Date;
+      status: string;
+      busId: string;
+      driverId: string;
+    } = {
       routeId: effectiveRouteId,
       departureTime: effectiveDepartureTime,
       status: status || "completed",
+      busId: "", // Will be set below
+      driverId: "", // Will be set below
     };
 
-    // Only add busId and driverId if they're available
+    // Set busId - either from input or from default
     if (busId) {
       tripData.busId = busId;
     } else {
@@ -276,6 +284,7 @@ async function createTrip(req: NextRequest) {
       }
     }
 
+    // Set driverId - either from input or from default
     if (driverId) {
       tripData.driverId = driverId;
     } else {
@@ -295,11 +304,16 @@ async function createTrip(req: NextRequest) {
     });
 
     return NextResponse.json(trip, { status: 201 });
-  } catch (tripError) {
-    console.error("Error creating trip:", tripError);
+  } catch (error: unknown) {
+    console.error("Error creating trip:", error);
+
+    const tripError = error as { message?: string };
 
     // Provide more helpful error message based on the error
-    if (tripError.message.includes("Foreign key constraint failed")) {
+    if (
+      tripError.message &&
+      tripError.message.includes("Foreign key constraint failed")
+    ) {
       return NextResponse.json(
         {
           error:

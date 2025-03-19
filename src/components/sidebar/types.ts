@@ -35,10 +35,12 @@ export interface NavItem {
   url: string;
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   badge?: string;
+  requiredRole?: string[];
   items?: {
     title: string;
     url: string;
     icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    requiredRole?: string[];
   }[];
 }
 

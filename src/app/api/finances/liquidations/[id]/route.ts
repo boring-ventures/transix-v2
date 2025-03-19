@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRoleProtection } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { format } from "date-fns";
 
 // Get a single liquidation with related data
 async function getLiquidation(
@@ -40,12 +41,11 @@ async function getLiquidation(
                 createdAt: true,
               },
             },
-          },
-        },
-        // Get expenses specifically for this trip
-        expenses: {
-          include: {
-            category: true,
+            expenses: {
+              include: {
+                category: true,
+              },
+            },
           },
         },
       },
@@ -68,7 +68,7 @@ async function getLiquidation(
       0
     );
 
-    const totalExpenses = liquidation.expenses.reduce(
+    const totalExpenses = liquidation.trip.expenses.reduce(
       (sum, expense) =>
         sum +
         (typeof expense.amount === "object"
@@ -78,7 +78,7 @@ async function getLiquidation(
     );
 
     // Format the expenses to include category name
-    const formattedExpenses = liquidation.expenses.map((expense) => ({
+    const formattedExpenses = liquidation.trip.expenses.map((expense) => ({
       id: expense.id,
       description: expense.description,
       amount:
@@ -122,9 +122,14 @@ async function getLiquidation(
       createdAt: liquidation.createdAt,
       updatedAt: liquidation.updatedAt,
       createdBy: liquidation.createdBy,
+      liquidationCode: `LIQ-${
+        liquidation.trip.bus?.plateNumber
+          ? liquidation.trip.bus.plateNumber
+          : "NOBUS"
+      }-${format(new Date(liquidation.createdAt), "yyyyMMdd")}`,
       liquidationDate: liquidation.createdAt,
       plateNumber: liquidation.trip.bus?.plateNumber || "No asignado",
-      busType: liquidation.trip.bus?.template?.name || "No asignado",
+      busType: "No asignado",
       ownerName: liquidation.trip.driver?.fullName || "No asignado",
       trip: {
         id: liquidation.trip.id,
@@ -142,7 +147,7 @@ async function getLiquidation(
           ? {
               id: liquidation.trip.bus.id,
               plate: liquidation.trip.bus.plateNumber,
-              model: liquidation.trip.bus.template?.name || "Standard",
+              model: "Standard",
             }
           : null,
         driver: liquidation.trip.driver

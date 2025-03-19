@@ -51,6 +51,44 @@ import {
 } from "@/components/ui/pagination";
 import { Label } from "@/components/ui/label";
 
+interface Settlement {
+  id: string;
+  settledAt: string;
+  status: string;
+  routeName?: string;
+  plateNumber?: string;
+  busType?: string;
+  ownerName?: string;
+  totalIncome?: number;
+  totalExpenses?: number;
+  netAmount?: number;
+  schedule?: {
+    routeSchedule?: {
+      route?: {
+        origin?: {
+          name?: string;
+        };
+        destination?: {
+          name?: string;
+        };
+      };
+    };
+    bus?: {
+      plateNumber?: string;
+      template?: {
+        name?: string;
+      };
+      company?: {
+        name?: string;
+      };
+    };
+    primaryDriver?: {
+      firstName?: string;
+      lastName?: string;
+    };
+  };
+}
+
 const getLiquidationStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case "pending":
@@ -64,7 +102,7 @@ const getLiquidationStatusColor = (status: string) => {
   }
 };
 
-const formatSettlements = (settlements) => {
+const formatSettlements = (settlements: Settlement[]) => {
   return settlements.map((settlement) => {
     // Log the first settlement for debugging
     if (settlements.indexOf(settlement) === 0) {
@@ -75,21 +113,24 @@ const formatSettlements = (settlements) => {
     const routeSchedule = schedule.routeSchedule || {};
     const route = routeSchedule.route || {};
     const bus = schedule.bus || {};
-    const driver = schedule.primaryDriver || {};
     const template = bus.template || {};
     const company = bus.company || {};
+
+    // Get origin and destination names, handling optional chaining correctly
+    const originName = route.origin?.name || "N/A";
+    const destinationName = route.destination?.name || "N/A";
+    const routeDisplay =
+      originName !== "N/A" && destinationName !== "N/A"
+        ? `${originName} - ${destinationName}`
+        : "N/A";
 
     return {
       id: settlement.id,
       settledAt: settlement.settledAt,
-      routeName:
-        settlement.routeName ||
-        (route.origin && route.destination
-          ? `${route.origin.name} - ${route.destination.name}`
-          : "N/A"),
+      routeName: settlement.routeName || routeDisplay,
       plateNumber: settlement.plateNumber || bus.plateNumber || "N/A",
-      busType: settlement.busType || template.name || "N/A",
-      ownerName: settlement.ownerName || company.name || "N/A",
+      busType: settlement.busType || template?.name || "N/A",
+      ownerName: settlement.ownerName || company?.name || "N/A",
       totalIncome:
         typeof settlement.totalIncome === "number" ? settlement.totalIncome : 0,
       totalExpenses:
@@ -104,12 +145,13 @@ const formatSettlements = (settlements) => {
 };
 
 export default function LiquidationsPage() {
-  const [liquidations, setLiquidations] = useState<any[]>([]);
+  const [liquidations, setLiquidations] = useState<
+    ReturnType<typeof formatSettlements>
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   const [statusFilter, setStatusFilter] = useState("all");
   const [startDateFilter, setStartDateFilter] = useState("");
   const [endDateFilter, setEndDateFilter] = useState("");
@@ -117,8 +159,7 @@ export default function LiquidationsPage() {
     key: "settledAt",
     dir: "desc",
   });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [searchTerm] = useState("");
 
   const { toast } = useToast();
 
@@ -147,7 +188,6 @@ export default function LiquidationsPage() {
       const responseData = await response.json();
 
       // Set pagination data
-      setTotalItems(responseData.pagination?.total || 0);
       setTotalPages(responseData.pagination?.totalPages || 1);
 
       // Map the data and set liquidations
@@ -289,12 +329,6 @@ export default function LiquidationsPage() {
           </div>
         </div>
 
-        {error && (
-          <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-200">
-            {error}
-          </div>
-        )}
-
         <Card>
           <CardHeader>
             <CardTitle>Liquidaciones de Viajes</CardTitle>
@@ -389,7 +423,7 @@ export default function LiquidationsPage() {
                         >
                           Gastos
                           {sortConfig.key === "totalExpenses" &&
-                            (sortConfig.direction === "asc" ? (
+                            (sortConfig.dir === "asc" ? (
                               <ChevronUp className="h-4 w-4 ml-1" />
                             ) : (
                               <ChevronDown className="h-4 w-4 ml-1" />
@@ -403,7 +437,7 @@ export default function LiquidationsPage() {
                         >
                           Neto
                           {sortConfig.key === "netAmount" &&
-                            (sortConfig.direction === "asc" ? (
+                            (sortConfig.dir === "asc" ? (
                               <ChevronUp className="h-4 w-4 ml-1" />
                             ) : (
                               <ChevronDown className="h-4 w-4 ml-1" />

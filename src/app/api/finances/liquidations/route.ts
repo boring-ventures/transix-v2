@@ -115,7 +115,7 @@ async function getLiquidations(req: NextRequest) {
         ownerName: liquidation.trip.driver?.fullName || "No asignado",
         busPlate: liquidation.trip.bus?.plateNumber || "No asignado",
         plateNumber: liquidation.trip.bus?.plateNumber || "No asignado",
-        busType: liquidation.trip.bus?.template?.name || "No asignado",
+        busType: "No asignado",
         totalIncome,
         totalExpenses,
         netAmount: totalIncome - totalExpenses,

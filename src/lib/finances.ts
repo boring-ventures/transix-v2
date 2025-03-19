@@ -136,7 +136,12 @@ export async function getFinancialSummary() {
       departureTime: "desc",
     },
     include: {
-      route: true,
+      route: {
+        include: {
+          origin: true,
+          destination: true,
+        },
+      },
       tickets: {
         select: {
           price: true,
@@ -153,17 +158,17 @@ export async function getFinancialSummary() {
   // Process trips to include financial data
   const processedTrips = recentTrips.map((trip) => {
     const income = trip.tickets.reduce(
-      (sum, ticket) => sum + (ticket.price || new Decimal(0)),
+      (sum, ticket) => sum.plus(ticket.price || new Decimal(0)),
       new Decimal(0)
     );
     const expenses = trip.expenses.reduce(
-      (sum, expense) => sum + (expense.amount || new Decimal(0)),
+      (sum, expense) => sum.plus(expense.amount || new Decimal(0)),
       new Decimal(0)
     );
 
     return {
       id: trip.id,
-      route: `${trip.route.originCode}-${trip.route.destinationCode}`,
+      route: `${trip.route.origin.name.substring(0, 3).toUpperCase()}-${trip.route.destination.name.substring(0, 3).toUpperCase()}`,
       date: trip.departureTime,
       income: income.toNumber(),
       expenses: expenses.toNumber(),
@@ -183,4 +188,133 @@ export async function getFinancialSummary() {
     completedLiquidations: completedLiquidationsCount,
     recentTrips: processedTrips,
   };
+}
+
+// Get expense distribution by category
+export async function getExpenseDistributionByCategory(
+  timeframe: "week" | "month" | "year" = "month"
+) {
+  let startDate = new Date();
+
+  // Set the start date based on the timeframe
+  if (timeframe === "week") {
+    startDate.setDate(startDate.getDate() - 7);
+  } else if (timeframe === "month") {
+    startDate.setMonth(startDate.getMonth() - 1);
+  } else if (timeframe === "year") {
+    startDate.setFullYear(startDate.getFullYear() - 1);
+  }
+
+  // Get expenses grouped by category
+  const expenses = await prisma.tripExpense.groupBy({
+    by: ["categoryId"],
+    _sum: {
+      amount: true,
+    },
+    where: {
+      createdAt: {
+        gte: startDate,
+      },
+    },
+  });
+
+  // Get category details for each expense group
+  const categories = await prisma.expenseCategory.findMany({
+    where: {
+      id: {
+        in: expenses.map((exp) => exp.categoryId),
+      },
+    },
+  });
+
+  // Map the results with category names
+  return expenses
+    .map((expense) => {
+      const category = categories.find((cat) => cat.id === expense.categoryId);
+      return {
+        name: category?.name || "Uncategorized",
+        value: expense._sum.amount?.toNumber() || 0,
+        id: expense.categoryId,
+      };
+    })
+    .sort((a, b) => b.value - a.value); // Sort by highest amount
+}
+
+// Get monthly financial data for charts
+export async function getMonthlyFinancialData(months: number = 6) {
+  const result = [];
+  const today = new Date();
+  const monthNames = [
+    "Ene",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dic",
+  ];
+
+  // Generate last X months data
+  for (let i = months - 1; i >= 0; i--) {
+    const currentMonth = new Date(today);
+    currentMonth.setMonth(today.getMonth() - i);
+
+    const startOfMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      1
+    );
+    const endOfMonth = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth() + 1,
+      0
+    );
+
+    // Get income for the month from tickets
+    const monthlyIncome = await prisma.ticket.aggregate({
+      _sum: {
+        price: true,
+      },
+      where: {
+        status: "active",
+        createdAt: {
+          gte: startOfMonth,
+          lte: endOfMonth,
+        },
+      },
+    });
+
+    // Get expenses for the month
+    const monthlyExpenses = await prisma.tripExpense.aggregate({
+      _sum: {
+        amount: true,
+      },
+      where: {
+        createdAt: {
+          gte: startOfMonth,
+          lte: endOfMonth,
+        },
+      },
+    });
+
+    const income = monthlyIncome._sum.price?.toNumber() || 0;
+    const expenses = monthlyExpenses._sum.amount?.toNumber() || 0;
+    const net = income - expenses;
+
+    result.push({
+      date: monthNames[currentMonth.getMonth()],
+      month: currentMonth.getMonth(),
+      year: currentMonth.getFullYear(),
+      income,
+      expenses,
+      net,
+    });
+  }
+
+  return result;
 }

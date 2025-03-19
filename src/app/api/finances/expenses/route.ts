@@ -56,16 +56,12 @@ async function getExpenses(req: NextRequest) {
       },
       include: {
         category: true,
-        schedule: {
+        trip: {
           include: {
-            routeSchedule: {
+            route: {
               include: {
-                route: {
-                  include: {
-                    origin: true,
-                    destination: true,
-                  },
-                },
+                origin: true,
+                destination: true,
               },
             },
           },
@@ -79,8 +75,8 @@ async function getExpenses(req: NextRequest) {
     // Format response
     const formattedExpenses = expenses.map((expense) => {
       let routeInfo = null;
-      if (expense.schedule && expense.schedule.routeSchedule) {
-        const route = expense.schedule.routeSchedule.route;
+      if (expense.trip && expense.trip.route) {
+        const route = expense.trip.route;
         const originCode = route.origin.name.substring(0, 3).toUpperCase();
         const destinationCode = route.destination.name
           .substring(0, 3)
@@ -94,7 +90,7 @@ async function getExpenses(req: NextRequest) {
 
       return {
         id: expense.id,
-        scheduleId: expense.scheduleId,
+        tripId: expense.tripId,
         tripSettlementId: expense.tripSettlementId,
         categoryId: expense.categoryId,
         categoryName: expense.category.name,
@@ -109,7 +105,7 @@ async function getExpenses(req: NextRequest) {
         createdBy: expense.createdBy,
         route: routeInfo ? routeInfo.code : null,
         routeName: routeInfo ? routeInfo.name : null,
-        departureTime: expense.schedule ? expense.schedule.departureDate : null,
+        departureTime: expense.trip ? expense.trip.departureTime : null,
       };
     });
 
@@ -135,7 +131,6 @@ async function createExpense(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      scheduleId,
       categoryId,
       amount,
       description,
@@ -146,40 +141,13 @@ async function createExpense(req: NextRequest) {
     } = body;
 
     // Check if required fields are present
-    if ((!scheduleId && !tripId) || amount === undefined) {
+    if (!tripId || amount === undefined) {
       return NextResponse.json(
         {
-          error:
-            "Missing required fields: tripId (or scheduleId) and amount are required",
+          error: "Missing required fields: tripId and amount are required",
         },
         { status: 400 }
       );
-    }
-
-    // If we have scheduleId but not tripId, we need to get the trip ID from the schedule
-    let effectiveTripId = tripId;
-    if (!effectiveTripId && scheduleId) {
-      // Try to look up trip ID from schedule
-      try {
-        const schedule = await prisma.schedule.findUnique({
-          where: { id: scheduleId },
-          include: {
-            Trip: true,
-          },
-        });
-
-        if (schedule && schedule.Trip && schedule.Trip.length > 0) {
-          effectiveTripId = schedule.Trip[0].id;
-        } else {
-          effectiveTripId = "default-trip-id"; // Fallback
-        }
-      } catch (error) {
-        console.error("Error finding trip for schedule:", error);
-        effectiveTripId = "default-trip-id"; // Fallback
-      }
-    } else if (!effectiveTripId) {
-      // If no tripId or scheduleId, use a default
-      effectiveTripId = "default-trip-id";
     }
 
     // If categoryId is provided, check if it exists
@@ -245,7 +213,7 @@ async function createExpense(req: NextRequest) {
     // Create the expense with the possibly updated category ID
     try {
       // Validate tripId more strictly
-      if (!effectiveTripId) {
+      if (!tripId) {
         // If we don't have a valid tripId, return an error
         return NextResponse.json(
           { error: "A valid tripId is required" },
@@ -256,7 +224,7 @@ async function createExpense(req: NextRequest) {
       // Create the expense
       const expense = await prisma.tripExpense.create({
         data: {
-          tripId: effectiveTripId,
+          tripId,
           categoryId: expenseCategoryId,
           amount,
           description: description || "",
@@ -287,26 +255,28 @@ async function createExpense(req: NextRequest) {
         },
         { status: 201 }
       );
-    } catch (prismaError) {
-      console.error(
-        "Error creating expense, trying minimal data:",
-        prismaError
-      );
+    } catch (error) {
+      // Log the error for debugging
+      console.error("Error creating expense:", error);
 
-      // If we got a validation error with tripId, check and create a Trip if needed
-      let fallbackTripId = effectiveTripId;
+      // Handle Prisma errors specifically
+      let fallbackTripId = tripId;
+
+      // Type check if error is an object with a message property
+      const prismaError = error as { message?: string };
       if (
         prismaError.message &&
         prismaError.message.includes("Foreign key constraint failed") &&
         prismaError.message.includes("tripId")
       ) {
         try {
-          // Try to create a placeholder trip
+          // Create a minimal Trip for this expense if it's a foreign key issue
           const defaultTrip = await prisma.trip.create({
             data: {
+              busId: "default-bus-id", // Need a valid busId
+              driverId: "default-driver-id", // Need a valid driverId
               status: "completed",
               departureTime: new Date(),
-              createdBy: createdBy || "system",
               routeId: "default-route-id", // Need a valid routeId
             },
           });

@@ -19,6 +19,29 @@ import { ArrowLeft, Check, Edit, FileWarning, Printer, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LiquidationPrint from "../../components/liquidation-print";
 
+interface LiquidationData {
+  id: string;
+  settledAt?: string;
+  departureTime?: string;
+  status: string;
+  routeName?: string;
+  ownerName?: string;
+  plateNumber?: string;
+  busType?: string;
+  totalIncome?: number;
+  totalExpenses?: number;
+  netAmount?: number;
+  totalPassengers?: number;
+  tripSettlementId?: string;
+  details?: string;
+  expenses?: {
+    id: string;
+    category: string;
+    description?: string;
+    amount: number;
+  }[];
+}
+
 const getLiquidationStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case "pending":
@@ -39,7 +62,8 @@ export default function LiquidationDetailPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [liquidationData, setLiquidationData] = useState<any>(null);
+  const [liquidationData, setLiquidationData] =
+    useState<LiquidationData | null>(null);
   const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
@@ -80,7 +104,10 @@ export default function LiquidationDetailPage() {
   }, [liquidationId]);
 
   // Handle status update
-  const updateStatus = async (newStatus) => {
+  const updateStatus = async (newStatus: string) => {
+    console.log(
+      `Attempting to update liquidation ${liquidationId} status to ${newStatus}`
+    );
     try {
       const response = await fetch(
         `/api/finances/trip-settlements/${liquidationId}`,
@@ -91,11 +118,18 @@ export default function LiquidationDetailPage() {
         }
       );
 
+      console.log(`API response status: ${response.status}`);
+
       if (!response.ok) {
-        throw new Error(`Failed to update status to ${newStatus}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error(`Error response:`, errorData);
+        throw new Error(
+          `Failed to update status to ${newStatus}: ${response.statusText}`
+        );
       }
 
       const updatedData = await response.json();
+      console.log(`Successfully updated status to ${newStatus}`, updatedData);
       setLiquidationData(updatedData);
       return true;
     } catch (error) {
@@ -106,24 +140,34 @@ export default function LiquidationDetailPage() {
 
   const handleApprove = async () => {
     if (confirm("¿Estás seguro de aprobar este arreglo de viaje?")) {
+      console.log("User confirmed approval");
       const success = await updateStatus("COMPLETED");
       if (success) {
         alert("Arreglo de viaje aprobado exitosamente");
       } else {
-        alert("Error al aprobar el arreglo de viaje");
+        alert(
+          "Error al aprobar el arreglo de viaje. Por favor, intenta de nuevo."
+        );
       }
+    } else {
+      console.log("Approval cancelled by user");
     }
   };
 
   const handleReject = async () => {
     const reason = prompt("Ingresa el motivo del rechazo:");
     if (reason) {
+      console.log(`User confirmed rejection with reason: ${reason}`);
       const success = await updateStatus("CANCELLED");
       if (success) {
-        alert("Arreglo de viaje rechazado");
+        alert("Arreglo de viaje rechazado exitosamente");
       } else {
-        alert("Error al rechazar el arreglo de viaje");
+        alert(
+          "Error al rechazar el arreglo de viaje. Por favor, intenta de nuevo."
+        );
       }
+    } else {
+      console.log("Rejection cancelled by user");
     }
   };
 
@@ -257,8 +301,7 @@ export default function LiquidationDetailPage() {
                               Total de ingresos
                             </p>
                             <p className="font-medium">
-                              Bs{" "}
-                              {Number(liquidationData.totalIncome).toFixed(2)}
+                              Bs {(liquidationData.totalIncome || 0).toFixed(2)}
                             </p>
                           </div>
                         </div>
@@ -299,7 +342,7 @@ export default function LiquidationDetailPage() {
                             <div className="text-right">
                               <p className="font-medium">
                                 Bs{" "}
-                                {Number(liquidationData.totalExpenses).toFixed(
+                                {(liquidationData.totalExpenses || 0).toFixed(
                                   2
                                 )}
                               </p>
@@ -323,16 +366,16 @@ export default function LiquidationDetailPage() {
                             <p className="font-medium">Monto neto</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">
-                              Bs{" "}
-                              {Number(liquidationData.totalIncome).toFixed(2)}
+                            <p className="font-medium text-green-600">
+                              + Bs{" "}
+                              {(liquidationData.totalIncome || 0).toFixed(2)}
                             </p>
-                            <p className="text-sm text-muted-foreground">
-                              Bs{" "}
-                              {Number(liquidationData.totalExpenses).toFixed(2)}
+                            <p className="font-medium text-red-600">
+                              - Bs{" "}
+                              {(liquidationData.totalExpenses || 0).toFixed(2)}
                             </p>
                             <p className="font-medium">
-                              Bs {Number(liquidationData.netAmount).toFixed(2)}
+                              Bs {(liquidationData.netAmount || 0).toFixed(2)}
                             </p>
                           </div>
                         </div>
@@ -365,7 +408,7 @@ export default function LiquidationDetailPage() {
                   </Tabs>
                 </CardContent>
                 <CardFooter className="flex justify-end space-x-2">
-                  {liquidationData.status === "pending" && (
+                  {liquidationData.status === "PENDING" && (
                     <>
                       <Button variant="destructive" onClick={handleReject}>
                         <X className="mr-2 h-4 w-4" />
@@ -386,7 +429,7 @@ export default function LiquidationDetailPage() {
                     </>
                   )}
 
-                  {liquidationData.status === "approved" && (
+                  {liquidationData.status === "COMPLETED" && (
                     <>
                       <Button variant="outline" asChild>
                         <a
@@ -399,8 +442,8 @@ export default function LiquidationDetailPage() {
                     </>
                   )}
 
-                  {(liquidationData.status === "rejected" ||
-                    liquidationData.status === "finalized") && (
+                  {(liquidationData.status === "CANCELLED" ||
+                    liquidationData.status === "COMPLETED") && (
                     <Button variant="outline" asChild>
                       <a
                         href={`/finances/liquidations/${liquidationId}/print`}
@@ -431,10 +474,12 @@ export default function LiquidationDetailPage() {
                       Fecha de Salida
                     </h3>
                     <p>
-                      {format(
-                        new Date(liquidationData.departureTime),
-                        "dd/MM/yyyy HH:mm"
-                      )}
+                      {liquidationData.departureTime
+                        ? format(
+                            new Date(liquidationData.departureTime),
+                            "dd/MM/yyyy HH:mm"
+                          )
+                        : "N/A"}
                     </p>
                   </div>
                   <div>
@@ -465,7 +510,7 @@ export default function LiquidationDetailPage() {
                       Ingresos:
                     </span>
                     <span className="font-medium">
-                      Bs {liquidationData.totalIncome.toFixed(2)}
+                      Bs {(liquidationData.totalIncome || 0).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -473,14 +518,14 @@ export default function LiquidationDetailPage() {
                       Gastos:
                     </span>
                     <span className="font-medium">
-                      Bs {liquidationData.totalExpenses.toFixed(2)}
+                      Bs {(liquidationData.totalExpenses || 0).toFixed(2)}
                     </span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
                     <span className="font-medium">Liquidación Total:</span>
                     <span className="font-bold">
-                      Bs {liquidationData.netAmount.toFixed(2)}
+                      Bs {(liquidationData.netAmount || 0).toFixed(2)}
                     </span>
                   </div>
                 </CardContent>

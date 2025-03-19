@@ -32,7 +32,7 @@ import { format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { CalendarIcon, Loader2, SaveIcon } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -44,6 +44,21 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
+
+interface Schedule {
+  id: string;
+  routeName: string;
+  plateNumber: string;
+  busType?: string;
+  departureTime: string;
+  departureDate?: string;
+  ownerName: string;
+  ticketsSold: number;
+  route?: {
+    routeName: string;
+  };
+  driverName?: string;
+}
 
 const liquidationFormSchema = z.object({
   scheduleId: z.string().min(1, { message: "Por favor selecciona un viaje" }),
@@ -116,7 +131,7 @@ const liquidationFormSchema = z.object({
 export default function NewLiquidationPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [availableSchedules, setAvailableSchedules] = useState<any[]>([]);
+  const [availableSchedules, setAvailableSchedules] = useState<Schedule[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -150,7 +165,7 @@ export default function NewLiquidationPage() {
     },
   });
 
-  const { watch, setValue, getValues } = form;
+  const { watch, setValue } = form;
 
   // Calculate derived values
   const fullFarePassengers = watch("fullFarePassengers");
@@ -205,7 +220,7 @@ export default function NewLiquidationPage() {
 
         // Map the schedule data to the format expected by the form
         const formattedSchedules = schedulesData.schedules.map(
-          (schedule: any) => ({
+          (schedule: Schedule) => ({
             id: schedule.id,
             routeName: schedule.route ? schedule.route.routeName : "Sin ruta",
             plateNumber: schedule.plateNumber || "Sin asignar",
@@ -519,7 +534,7 @@ export default function NewLiquidationPage() {
       toast({
         title: "Liquidación creada",
         description: "La liquidación se ha creado exitosamente.",
-        variant: "success",
+        variant: "default",
       });
 
       router.push("/finances/liquidations");

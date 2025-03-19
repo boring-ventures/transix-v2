@@ -5,9 +5,30 @@ import { format } from "date-fns";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+interface Expense {
+  id: string;
+  category: string;
+  description?: string;
+  amount: number;
+}
+
+interface LiquidationData {
+  settledAt?: string;
+  departureTime?: string;
+  expenses?: Expense[];
+  totalIncome?: number;
+  totalExpenses?: number;
+  netAmount?: number;
+  ownerName?: string;
+  routeName?: string;
+  plateNumber?: string;
+  busType?: string;
+  details?: string;
+}
+
 interface LiquidationPrintProps {
   liquidationId?: string;
-  data?: any;
+  data?: LiquidationData;
   onPrint?: () => void;
 }
 
@@ -17,7 +38,7 @@ export default function LiquidationPrint({
   onPrint,
 }: LiquidationPrintProps) {
   const [isLoading, setIsLoading] = useState(!initialData && !!liquidationId);
-  const [data, setData] = useState<any>(initialData || null);
+  const [data, setData] = useState<LiquidationData | null>(initialData || null);
 
   useEffect(() => {
     if (initialData) {

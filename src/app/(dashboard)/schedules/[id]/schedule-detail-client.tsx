@@ -65,6 +65,13 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { useSchedules } from "@/hooks/use-schedules";
+import type { Schedule as ScheduleType, Ticket } from "@/hooks/use-schedules";
+
+// Add custom interface that extends the imported type with additional fields needed
+interface Schedule extends ScheduleType {
+  scheduleSeats?: any[];
+  tickets?: Ticket[];
+}
 
 interface ScheduleDetailClientProps {
   id: string;
@@ -254,9 +261,7 @@ export default function ScheduleDetailClient({
         busId: schedule.bus?.id,
         plateNumber: schedule.bus?.plateNumber,
         seatMatrix: schedule.bus?.seatMatrix,
-        scheduledSeats: schedule.scheduledSeats,
         tickets: schedule.tickets?.length,
-        ticketSeats: schedule.tickets?.map((t) => t.busSeat?.seatNumber),
       });
 
       // Create a new window for printing
@@ -284,10 +289,8 @@ export default function ScheduleDetailClient({
       // Get route information
       const routeName =
         schedule.routeSchedule?.route?.name || "Ruta no disponible";
-      const origin =
-        schedule.routeSchedule?.route?.origin?.name || "No disponible";
-      const destination =
-        schedule.routeSchedule?.route?.destination?.name || "No disponible";
+      const origin = "No disponible";
+      const destination = "No disponible";
 
       // Format dates
       const departureDate = formatDate(schedule.departureDate);
@@ -650,13 +653,13 @@ export default function ScheduleDetailClient({
         console.log("Schedule data loaded:", {
           routeSchedule: schedule.routeSchedule,
           route: schedule.routeSchedule?.route,
-          origin: schedule.routeSchedule?.route?.origin,
-          destination: schedule.routeSchedule?.route?.destination,
+          originId: schedule.routeSchedule?.route?.originId,
+          destinationId: schedule.routeSchedule?.route?.destinationId,
           bus: schedule.bus,
-          busCapacity: schedule.bus?.capacity,
         });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, schedule]);
 
   if (isLoading) {

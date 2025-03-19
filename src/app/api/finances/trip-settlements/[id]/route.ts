@@ -85,11 +85,7 @@ async function getTripSettlement(
     if (settlement.schedule?.bus) {
       busType = settlement.schedule.bus.template?.name || "Unknown";
       plateNumber = settlement.schedule.bus.plateNumber;
-
-      // Use company data for owner
-      if (settlement.schedule.bus.company) {
-        ownerName = settlement.schedule.bus.company.name;
-      }
+      ownerName = "Unknown";
     }
 
     if (settlement.schedule?.primaryDriver) {
@@ -235,11 +231,7 @@ async function updateTripSettlement(
     if (settlement.schedule?.bus) {
       busType = settlement.schedule.bus.template?.name || "Unknown";
       plateNumber = settlement.schedule.bus.plateNumber;
-
-      // Use company data for owner
-      if (settlement.schedule.bus.company) {
-        ownerName = settlement.schedule.bus.company.name;
-      }
+      ownerName = "Unknown";
     }
 
     if (settlement.schedule?.primaryDriver) {
@@ -375,7 +367,6 @@ async function getTripSettlementById(
             },
             bus: {
               include: {
-                owner: true,
                 template: true,
               },
             },
@@ -434,7 +425,7 @@ async function getTripSettlementById(
     if (settlement.schedule?.bus) {
       busType = settlement.schedule.bus.template?.name || "Unknown";
       plateNumber = settlement.schedule.bus.plateNumber;
-      ownerName = settlement.schedule.bus.owner?.name || "Unknown";
+      ownerName = "Unknown";
     }
 
     if (settlement.schedule?.primaryDriver) {

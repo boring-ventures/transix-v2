@@ -107,9 +107,7 @@ async function getSchedules(req: NextRequest) {
     const formattedSchedules = schedules.map((schedule) => {
       // Calculate total income from tickets and parcels
       const ticketIncome = schedule.tickets
-        .filter(
-          (ticket) => ticket.status === "sold" || ticket.status === "used"
-        )
+        .filter((ticket) => ticket.status === "active")
         .reduce((sum, ticket) => sum + Number(ticket.price), 0);
 
       const parcelIncome = schedule.parcels
@@ -147,9 +145,9 @@ async function getSchedules(req: NextRequest) {
         status: schedule.status,
         busId: schedule.busId,
         plateNumber: schedule.bus?.plateNumber,
-        busType: schedule.bus?.busType,
+        busType: "Standard",
         primaryDriverId: schedule.primaryDriverId,
-        driverName: schedule.primaryDriver?.name,
+        driverName: schedule.primaryDriver?.fullName,
         routeScheduleId: schedule.routeScheduleId,
         routeId: schedule.routeSchedule?.routeId,
         route: routeInfo,

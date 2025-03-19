@@ -194,10 +194,16 @@ export default function TicketSalesTable({ dateRange }: TicketSalesTableProps) {
       <Pagination>
         <PaginationContent>
           <PaginationItem>
-            <PaginationPrevious
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={page === 1}
-            />
+            {page > 1 ? (
+              <PaginationPrevious
+                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              />
+            ) : (
+              <PaginationPrevious
+                onClick={() => {}}
+                className="pointer-events-none opacity-50"
+              />
+            )}
           </PaginationItem>
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
             const pageNumber =
@@ -221,10 +227,18 @@ export default function TicketSalesTable({ dateRange }: TicketSalesTableProps) {
             );
           })}
           <PaginationItem>
-            <PaginationNext
-              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
-              disabled={page === totalPages}
-            />
+            {page < totalPages ? (
+              <PaginationNext
+                onClick={() =>
+                  setPage((prev) => Math.min(prev + 1, totalPages))
+                }
+              />
+            ) : (
+              <PaginationNext
+                onClick={() => {}}
+                className="pointer-events-none opacity-50"
+              />
+            )}
           </PaginationItem>
         </PaginationContent>
       </Pagination>
