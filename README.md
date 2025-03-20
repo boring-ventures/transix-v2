@@ -79,6 +79,43 @@ pnpm dev
 
 Your app will be available at `http://localhost:3000`
 
+### Docker Development with Hot Reloading
+
+For development with Docker and hot reloading:
+
+```bash
+# Start the development environment with hot reloading
+pnpm dev:docker
+# Or use the helper script
+pnpm docker:start
+```
+
+This will:
+
+- Build a development-focused Docker image
+- Mount your local files into the container
+- Enable hot reloading so changes to your code are immediately reflected
+- Expose the application on `http://localhost:3000`
+
+Additional Docker commands:
+
+```bash
+# Stop the Docker development environment
+pnpm docker:stop
+
+# Restart the Docker development environment
+pnpm docker:restart
+
+# Clean up Docker volumes and containers
+pnpm docker:clean
+
+# View Docker container logs
+pnpm docker:logs
+
+# Open a shell in the Docker container
+pnpm docker:shell
+```
+
 ## 📝 Database Management
 
 ### Initialize Prisma

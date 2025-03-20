@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache libc6-compat
+RUN npm install -g pnpm
+
+# Copy package.json and lock file first for better caching
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install
+
+# Copy the rest of the application
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+EXPOSE 3000
+
+# Start the application in development mode
+CMD ["pnpm", "dev"] 

@@ -22,6 +22,28 @@ services:
     networks:
       - transix-network
 
+  # Development service with hot reloading
+  dev:
+    container_name: transix-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      # Mount source code for hot reloading
+      - ./:/app
+      # Don't override node_modules in container
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+    networks:
+      - transix-network
+
 networks:
   transix-network:
     driver: bridge

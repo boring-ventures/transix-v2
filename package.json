@@ -4,6 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:docker": "docker-compose -f docker-compose.dev.yml up --build",
+    "docker:start": "./scripts/docker-dev.sh start",
+    "docker:stop": "./scripts/docker-dev.sh stop",
+    "docker:restart": "./scripts/docker-dev.sh restart",
+    "docker:clean": "./scripts/docker-dev.sh clean",
+    "docker:logs": "./scripts/docker-dev.sh logs",
+    "docker:shell": "./scripts/docker-dev.sh shell",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
