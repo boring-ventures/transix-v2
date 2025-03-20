@@ -18,29 +18,33 @@ A modern, full-stack Next.js template with Prisma, Supabase, React Query, and mo
 
 ## 📦 Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - PostgreSQL database (local or Supabase)
 - pnpm (recommended) or npm
 
 ## 🛠 Setup
 
 1. Clone the repository:
+
 ```bash
 git clone [your-repo-url]
 cd [your-project-name]
 ```
 
 2. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 3. Set up your environment variables:
+
 ```bash
 cp .env.example .env
 ```
 
 4. Configure your `.env` file:
+
 ```env
 # Database
 DATABASE_URL="postgresql://user:password@localhost:5432/dbname?schema=public"
@@ -59,6 +63,7 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
 5. Initialize Prisma:
+
 ```bash
 pnpm prisma generate
 pnpm prisma db push
@@ -67,6 +72,7 @@ pnpm prisma db push
 ## 🚀 Development
 
 Start the development server:
+
 ```bash
 pnpm dev
 ```
@@ -76,21 +82,25 @@ Your app will be available at `http://localhost:3000`
 ## 📝 Database Management
 
 ### Initialize Prisma
+
 ```bash
 pnpm prisma init
 ```
 
 ### Create a migration
+
 ```bash
 pnpm prisma migrate dev --name init
 ```
 
 ### Reset database
+
 ```bash
 pnpm prisma migrate reset
 ```
 
 ### Open Prisma Studio
+
 ```bash
 pnpm prisma studio
 ```
@@ -118,14 +128,50 @@ pnpm test:watch  # Run tests in watch mode
 ## 🚀 Deployment
 
 1. Build the application:
+
 ```bash
 pnpm build
 ```
 
 2. Start the production server:
+
 ```bash
 pnpm start
 ```
+
+### Deploying to Railway
+
+1. Push your code to GitHub.
+
+2. Connect your GitHub repository to Railway:
+
+   - Create a new project in Railway
+   - Select "Deploy from GitHub repo"
+   - Choose your repository
+
+3. Configure environment variables in Railway:
+
+   - Go to your project's "Variables" tab
+   - Add all required environment variables from `.env.example`
+   - For Supabase, make sure to add:
+     - `NEXT_PUBLIC_SUPABASE_URL`
+     - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+     - `NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET`
+   - For database, set the Supabase connection strings:
+     - `DATABASE_URL` (Supabase connection pooling URL)
+     - `DIRECT_URL` (Direct Supabase connection URL)
+
+4. Deploy your application:
+
+   - Railway will automatically build and deploy your application
+   - Environment variables will be available during both build and runtime
+
+5. Custom domain (optional):
+   - Go to the "Settings" tab
+   - Click "Generate Domain" or "Custom Domain"
+   - Follow the instructions to set up DNS
+
+Note: This application uses Supabase for the database and storage, not a local database container.
 
 ## 📚 Key Dependencies
 
@@ -141,12 +187,15 @@ pnpm start
 ## 🔧 Common Issues & Solutions
 
 ### Prisma Client Issues
+
 If you encounter Prisma Client issues, try:
+
 ```bash
 pnpm prisma generate
 ```
 
 ### Database Connection Issues
+
 - Verify your DATABASE_URL in .env
 - Ensure PostgreSQL is running
 - Check network access and firewall settings
@@ -170,10 +219,10 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [Supabase](https://supabase.com/)
 - [TanStack Query](https://tanstack.com/query)
 
-
 ## Credentials
 
 ### Supabase
+
 - Project name: POSITIVE-Next-Template
 - DB Password: e9zKY_Km5HbkiiF
 - Anon Public Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3Zmd2ZmhwbWljd3B0dXBqeWtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwNjY4NDksImV4cCI6MjA1NTY0Mjg0OX0.OiccFqJXdAM6tPIvULA3EaZxtCOsuwhiMugjyGzXNFk
@@ -181,29 +230,34 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - Project URL: https://swfgvfhpmicwptupjyko.supabase.co
 
 - PRISMA URLs:
-    # Connect to Supabase via connection pooling with Supavisor.
-    DATABASE_URL="postgresql://postgres.swfgvfhpmicwptupjyko:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 
-    # Direct connection to the database. Used for migrations.
-    DIRECT_URL="postgresql://postgres.swfgvfhpmicwptupjyko:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
-        
+  # Connect to Supabase via connection pooling with Supavisor.
+
+  DATABASE_URL="postgresql://postgres.swfgvfhpmicwptupjyko:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+  # Direct connection to the database. Used for migrations.
+
+  DIRECT_URL="postgresql://postgres.swfgvfhpmicwptupjyko:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 
 ## 🏗 Architecture & Implementation Plan
 
 ### Core Modules To Implement
 
 #### 1. Authentication & Authorization [TODO]
+
 - [ ] User management system
 - [ ] Role-based access control (Admin, Company Manager, Staff)
 - [ ] Session management
 
 #### 2. Company Management [TODO]
+
 - [ ] Company profile CRUD operations
 - [ ] Company settings management
 - [ ] Multi-tenant architecture implementation
 - [ ] Company branding customization
 
 #### 3. Fleet Management [TODO]
+
 - [ ] Bus registration system
 - [ ] Bus template configuration
   - [ ] Seat layout designer
@@ -213,6 +267,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [ ] Maintenance scheduling
 
 #### 4. Route Management [TODO]
+
 - [ ] Route CRUD operations
 - [ ] Location management
 - [ ] Schedule template system
@@ -220,6 +275,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [ ] Route optimization tools
 
 #### 5. Schedule Management [TODO]
+
 - [ ] Schedule generation system
 - [ ] Real-time schedule updates
 - [ ] Schedule status tracking
@@ -227,6 +283,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [ ] Conflict detection
 
 #### 6. Ticket Management [TODO]
+
 - [ ] Ticket booking system
 - [ ] Seat selection interface
 - [ ] Dynamic pricing management
@@ -234,6 +291,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [ ] Cancellation handling
 
 #### 7. Personnel Management [TODO]
+
 - [ ] Driver profile management
 - [ ] Driver scheduling system
 - [ ] Document management
@@ -242,6 +300,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [ ] Performance monitoring
 
 #### 8. Customer Management [TODO]
+
 - [ ] Customer profile system
 - [ ] Booking history tracking
 - [ ] Passenger manifest generation
@@ -250,6 +309,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ### API Endpoints To Implement
 
 #### Fleet Management API
+
 - [ ] `/api/buses`
   - [ ] GET, POST, PUT, DELETE operations
   - [ ] Availability checking
@@ -259,15 +319,18 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [ ] `/api/bus-assignments`
 
 #### Route Management API
+
 - [ ] `/api/routes`
 - [ ] `/api/locations`
 - [ ] `/api/route-schedules`
 
 #### Schedule Management API
+
 - [ ] `/api/schedules`
 - [ ] `/api/assignments`
 
 #### Ticket Management API
+
 - [ ] `/api/tickets`
 - [ ] `/api/seat-tiers`
 - [ ] `/api/bookings`
@@ -275,6 +338,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ### Database Schema To Implement
 
 #### Core Entities
+
 - [ ] Company
   - [ ] Basic information
   - [ ] Operating parameters
@@ -299,6 +363,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ### Frontend Components To Implement
 
 #### Dashboard Views
+
 - [ ] Company Dashboard
 - [ ] Fleet Management Interface
 - [ ] Route Planning Tools
@@ -307,6 +372,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 - [ ] Reports and Analytics
 
 #### Customer-Facing Views
+
 - [ ] Route Search
 - [ ] Booking Interface
 - [ ] Seat Selection
@@ -335,5 +401,3 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
   - [ ] Critical User Flows
   - [ ] Payment Processing
   - [ ] Booking Flow
-
-        
