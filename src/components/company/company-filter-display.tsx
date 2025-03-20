@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCompanyFilter } from "@/hooks/use-company-filter";
-import { useCompanies } from "@/hooks/use-companies";
+import { useCompanies, type Company } from "@/hooks/use-companies";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,7 +42,7 @@ export function CompanyFilterDisplay({
   };
 
   const selectedCompany = companies.find(
-    (company) => company.id === (selectedCompanyId || companyId)
+    (company: Company) => company.id === (selectedCompanyId || companyId)
   );
 
   if (isCompanyRestricted && selectedCompany) {
@@ -79,7 +79,7 @@ export function CompanyFilterDisplay({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las empresas</SelectItem>
-            {companies.map((company) => (
+            {companies.map((company: Company) => (
               <SelectItem key={company.id} value={company.id}>
                 {company.name}
               </SelectItem>

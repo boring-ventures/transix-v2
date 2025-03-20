@@ -271,7 +271,7 @@ export function CreateProfileDialog({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {companies.map((company) => (
+                            {companies.map((company: Company) => (
                               <SelectItem key={company.id} value={company.id}>
                                 {company.name}
                               </SelectItem>
@@ -315,7 +315,7 @@ export function CreateProfileDialog({
                               No hay sucursales disponibles
                             </SelectItem>
                           ) : (
-                            branches.map((branch) => (
+                            branches.map((branch: Branch) => (
                               <SelectItem key={branch.id} value={branch.id}>
                                 {branch.name}
                               </SelectItem>

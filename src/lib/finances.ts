@@ -108,7 +108,7 @@ export async function getFinancialSummary(companyId?: string) {
     },
     where: {
       status: "active",
-      ...companyFilter,
+      ...(companyFilter as any),
     },
   });
 
@@ -118,7 +118,7 @@ export async function getFinancialSummary(companyId?: string) {
       amount: true,
     },
     where: {
-      ...companyFilter,
+      ...(companyFilter as any),
     },
   });
 
@@ -126,7 +126,7 @@ export async function getFinancialSummary(companyId?: string) {
   const pendingLiquidationsCount = await prisma.tripLiquidation.count({
     where: {
       status: "pending",
-      ...companyFilter,
+      ...(companyFilter as any),
     },
   });
 
@@ -134,7 +134,7 @@ export async function getFinancialSummary(companyId?: string) {
   const completedLiquidationsCount = await prisma.tripLiquidation.count({
     where: {
       status: "finalized",
-      ...companyFilter,
+      ...(companyFilter as any),
     },
   });
 
@@ -145,7 +145,7 @@ export async function getFinancialSummary(companyId?: string) {
       departureTime: "desc",
     },
     where: {
-      ...companyFilter,
+      ...(companyFilter as any),
     },
     include: {
       route: {

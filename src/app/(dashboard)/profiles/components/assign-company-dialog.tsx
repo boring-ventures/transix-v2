@@ -189,7 +189,7 @@ export function AssignCompanyDialog({
                           No hay sucursales disponibles
                         </SelectItem>
                       ) : (
-                        branches.map((branch) => (
+                        branches.map((branch: Branch) => (
                           <SelectItem key={branch.id} value={branch.id}>
                             {branch.name}
                           </SelectItem>
