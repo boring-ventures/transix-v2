@@ -1,13 +1,13 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+import localFont from "next/font/local";
+import { AuthProvider } from "@/providers/auth-provider";
 import { QueryProvider } from "@/lib/providers/QueryProvider";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/providers/auth-provider";
-import { ThemeProvider } from "@/context/theme-context";
 
-const APP_NAME = "POSITIVE-NEXT";
-const APP_DESCRIPTION = "Your Mind's Best Friend";
+const APP_NAME = "TRANSIX";
+const APP_DESCRIPTION = "Transportation Management System";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export const metadata: Metadata = {
@@ -47,14 +47,16 @@ export const metadata: Metadata = {
   },
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const neutro = localFont({
+  src: "../../public/fonts/Neutro-ExtraBold.otf",
+  variable: "--font-neutro",
+  display: "swap",
 });
 
 export default function RootLayout({
@@ -64,15 +66,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ThemeProvider defaultTheme="system" storageKey="app-theme">
-          <AuthProvider>
-            <QueryProvider>
-              {children}
-              <Toaster />
-            </QueryProvider>
-          </AuthProvider>
-        </ThemeProvider>
+      <body
+        className={`${inter.variable} ${neutro.variable}`}
+        suppressHydrationWarning
+      >
+        <AuthProvider>
+          <QueryProvider>
+            {children}
+          </QueryProvider>
+        </AuthProvider>
+        <Toaster />
       </body>
     </html>
   );

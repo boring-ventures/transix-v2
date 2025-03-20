@@ -14,7 +14,9 @@ export const metadata: Metadata = {
 
 export default async function SignInPage() {
   const supabase = createServerComponentClient({ cookies });
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (session) {
     redirect("/dashboard");
@@ -27,13 +29,7 @@ export default async function SignInPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Login</h1>
           <p className="text-sm text-muted-foreground">
             Enter your email and password below <br />
-            to log into your account.{" "}
-            <Link
-              href="/sign-up"
-              className="underline underline-offset-4 hover:text-primary"
-            >
-              Don&apos;t have an account?
-            </Link>
+            to log into your account.
           </p>
         </div>
         <UserAuthForm />
@@ -57,4 +53,4 @@ export default async function SignInPage() {
       </Card>
     </AuthLayout>
   );
-} 
+}
