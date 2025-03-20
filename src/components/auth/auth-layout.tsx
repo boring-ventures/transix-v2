@@ -14,7 +14,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <div className="flex h-12 w-12 items-center justify-center rounded-md">
             <Image
               src="/images/transix.svg"
-              alt="Transix Logo"
+              alt="Logo de Transix"
               width={100}
               height={100}
               className="text-primary-foreground"

@@ -40,14 +40,14 @@ export function LoginForm() {
       setIsLoading(true);
       await signIn(data.email, data.password);
       toast({
-        title: "Success",
-        description: "You have been signed in.",
+        title: "Éxito",
+        description: "Has iniciado sesión correctamente.",
       });
       router.push("/dashboard");
     } catch {
       toast({
         title: "Error",
-        description: "Invalid email or password.",
+        description: "Correo electrónico o contraseña inválidos.",
         variant: "destructive",
       });
     } finally {
@@ -58,10 +58,12 @@ export function LoginForm() {
   return (
     <Card className="p-6">
       <div className="flex flex-col space-y-2 text-left">
-        <h1 className="text-2xl font-semibold tracking-tight">Login</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Iniciar Sesión
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Enter your email and password below <br />
-          to log into your account.
+          Ingresa tu correo electrónico y contraseña <br />
+          para acceder a tu cuenta.
         </p>
       </div>
       <Form {...form}>
@@ -71,9 +73,9 @@ export function LoginForm() {
             name="email"
             render={({ field }) => (
               <FormItem className="space-y-1">
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Correo electrónico</FormLabel>
                 <FormControl>
-                  <Input placeholder="name@example.com" {...field} />
+                  <Input placeholder="nombre@ejemplo.com" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -85,12 +87,12 @@ export function LoginForm() {
             render={({ field }) => (
               <FormItem className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel>Contraseña</FormLabel>
                   <Link
                     href="/forgot-password"
                     className="text-sm font-medium text-muted-foreground hover:opacity-75"
                   >
-                    Forgot password?
+                    ¿Olvidaste tu contraseña?
                   </Link>
                 </div>
                 <FormControl>
@@ -101,24 +103,24 @@ export function LoginForm() {
             )}
           />
           <Button className="w-full" type="submit" disabled={isLoading}>
-            {isLoading ? "Logging in..." : "Login"}
+            {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
           </Button>
         </form>
       </Form>
       <p className="mt-4 text-center text-sm text-muted-foreground">
-        By clicking login, you agree to our{" "}
+        Al hacer clic en iniciar sesión, aceptas nuestros{" "}
         <Link
           href="/terms"
           className="underline underline-offset-4 hover:text-primary"
         >
-          Terms of Service
+          Términos de Servicio
         </Link>{" "}
-        and{" "}
+        y{" "}
         <Link
           href="/privacy"
           className="underline underline-offset-4 hover:text-primary"
         >
-          Privacy Policy
+          Política de Privacidad
         </Link>
         .
       </p>

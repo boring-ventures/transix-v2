@@ -7,7 +7,7 @@ import { QueryProvider } from "@/lib/providers/QueryProvider";
 import { Toaster } from "@/components/ui/toaster";
 
 const APP_NAME = "TRANSIX";
-const APP_DESCRIPTION = "Transportation Management System";
+const APP_DESCRIPTION = "Sistema de Gestión de Transporte";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export const metadata: Metadata = {
@@ -65,15 +65,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${neutro.variable}`}
         suppressHydrationWarning
       >
         <AuthProvider>
-          <QueryProvider>
-            {children}
-          </QueryProvider>
+          <QueryProvider>{children}</QueryProvider>
         </AuthProvider>
         <Toaster />
       </body>

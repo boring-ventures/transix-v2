@@ -36,7 +36,7 @@ export function TeamSwitcher({
             <span className="truncate font-neutro text-base tracking-wide">
               TRANSIX
             </span>
-            <span className="truncate text-xs">Transportation System</span>
+            <span className="truncate text-xs">Sistema de Transporte</span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
