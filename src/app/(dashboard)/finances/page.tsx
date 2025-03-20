@@ -71,6 +71,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { useFinances } from "@/hooks/use-finances";
 
 interface Settlement {
   id: string;
@@ -277,9 +278,13 @@ const ExpenseDistributionChart = ({
 };
 
 export default function FinancesDashboardPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [financeStats, setFinanceStats] = useState<FinanceStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    financeStats,
+    isLoading: isFinancesLoading,
+    error: financesError,
+    fetchMonthlyData,
+    fetchExpenseDistribution,
+  } = useFinances();
 
   // Liquidations state
   const [liquidations, setLiquidations] = useState<FormattedSettlement[]>([]);
@@ -294,6 +299,7 @@ export default function FinancesDashboardPage() {
     dir: "desc",
   });
   const [searchTerm] = useState("");
+  const [isLiquidationsLoading, setIsLiquidationsLoading] = useState(false);
 
   // Real expense data from API
   const [expenseCategories, setExpenseCategories] = useState<
@@ -307,45 +313,12 @@ export default function FinancesDashboardPage() {
 
   const { toast } = useToast();
 
-  useEffect(() => {
-    async function fetchFinancialData() {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const response = await fetch("/api/finances");
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch financial data");
-        }
-
-        const data = await response.json();
-        setFinanceStats(data);
-      } catch (err) {
-        console.error("Error fetching financial data:", err);
-        setError("Error loading financial data. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchFinancialData();
-  }, []);
-
   // Fetch expense distribution data
   useEffect(() => {
-    async function fetchExpenseDistribution() {
+    async function fetchExpenseData() {
       try {
         setTimeframeLoading(true);
-        const response = await fetch(
-          `/api/finances/reports?report=expenses&timeframe=${expenseTimeframe}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch expense distribution");
-        }
-
-        const data = await response.json();
+        const data = await fetchExpenseDistribution(expenseTimeframe);
         setExpenseCategories(data);
       } catch (err) {
         console.error("Error fetching expense distribution:", err);
@@ -359,22 +332,14 @@ export default function FinancesDashboardPage() {
       }
     }
 
-    fetchExpenseDistribution();
-  }, [expenseTimeframe, toast]);
+    fetchExpenseData();
+  }, [expenseTimeframe, fetchExpenseDistribution, toast]);
 
   // Fetch monthly financial data
   useEffect(() => {
     async function fetchMonthlyFinancialData() {
       try {
-        const response = await fetch(
-          `/api/finances/reports?report=monthly&months=6`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch monthly financial data");
-        }
-
-        const data = await response.json();
+        const data = await fetchMonthlyData(6);
         setMonthlyData(data);
       } catch (err) {
         console.error("Error fetching monthly financial data:", err);
@@ -387,7 +352,7 @@ export default function FinancesDashboardPage() {
     }
 
     fetchMonthlyFinancialData();
-  }, [toast]);
+  }, [fetchMonthlyData, toast]);
 
   const fetchLiquidations = async (
     page = currentPage,
@@ -395,7 +360,7 @@ export default function FinancesDashboardPage() {
     sortBy = sortConfig.key,
     sortOrder = sortConfig.dir
   ) => {
-    setIsLoading(true);
+    setIsLiquidationsLoading(true);
     try {
       const response = await fetch(
         `/api/finances/trip-settlements?page=${page}&limit=${limit}&sortBy=${sortBy}&sortOrder=${sortOrder}${
@@ -427,7 +392,7 @@ export default function FinancesDashboardPage() {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsLiquidationsLoading(false);
     }
   };
 
@@ -469,6 +434,8 @@ export default function FinancesDashboardPage() {
   return (
     <ConditionalUI
       allowedRoles={["superadmin", "company_admin", "branch_admin"]}
+      showAccessDenied={true}
+      message="No tienes permisos para acceder a las finanzas."
     >
       <div className="container mx-auto py-6 space-y-8">
         <div className="flex items-center justify-between">
@@ -485,15 +452,23 @@ export default function FinancesDashboardPage() {
           </div>
         </div>
 
-        {error && (
+        {financesError && (
           <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-200">
-            {error}
+            {typeof financesError === "string"
+              ? financesError
+              : "Error loading finance data"}
           </div>
         )}
 
-        {isLoading && !financeStats ? (
+        {isFinancesLoading && !financeStats ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : financesError ? (
+          <div className="bg-destructive/10 p-4 rounded-md text-destructive">
+            {typeof financesError === "string"
+              ? financesError
+              : "Error loading finance data"}
           </div>
         ) : (
           <>

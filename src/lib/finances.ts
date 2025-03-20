@@ -97,43 +97,55 @@ export async function updateLiquidationStatus(
 }
 
 // Get financial summary for dashboard
-export async function getFinancialSummary() {
-  // Get total income
+export async function getFinancialSummary(companyId?: string) {
+  // Build common where clause for filtering by company
+  const companyFilter = companyId ? { companyId } : {};
+
+  // Get total income with optional company filter
   const totalIncomeResult = await prisma.ticket.aggregate({
     _sum: {
       price: true,
     },
     where: {
       status: "active",
+      ...companyFilter,
     },
   });
 
-  // Get total expenses
+  // Get total expenses with optional company filter
   const totalExpensesResult = await prisma.tripExpense.aggregate({
     _sum: {
       amount: true,
     },
+    where: {
+      ...companyFilter,
+    },
   });
 
-  // Get number of pending liquidations
+  // Get number of pending liquidations with optional company filter
   const pendingLiquidationsCount = await prisma.tripLiquidation.count({
     where: {
       status: "pending",
+      ...companyFilter,
     },
   });
 
-  // Get number of completed liquidations
+  // Get number of completed liquidations with optional company filter
   const completedLiquidationsCount = await prisma.tripLiquidation.count({
     where: {
       status: "finalized",
+      ...companyFilter,
     },
   });
 
-  // Get recent trips with financial data
+  // Get recent trips with financial data with optional company filter
   const recentTrips = await prisma.trip.findMany({
     take: 5,
     orderBy: {
       departureTime: "desc",
+    },
+    where: {
+      ...companyFilter,
     },
     include: {
       route: {

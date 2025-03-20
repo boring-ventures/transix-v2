@@ -6,6 +6,7 @@ import type { ScheduleStatus } from "@prisma/client";
 import type { Bus } from "@/hooks/use-buses";
 import type { Driver } from "@/hooks/use-drivers";
 import type { Route } from "@/hooks/use-routes";
+import { useCompanyFilter } from "./use-company-filter";
 
 export type Schedule = {
   id: string;
@@ -210,6 +211,7 @@ export function useSchedules({
   routeScheduleId?: string;
 } = {}) {
   const queryClient = useQueryClient();
+  const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
 
   // Fetch all schedules with optional filtering
   const {
@@ -229,6 +231,7 @@ export function useSchedules({
         fromDate,
         toDate,
         routeScheduleId,
+        userCompanyId,
       },
     ],
     queryFn: async () => {
@@ -244,6 +247,11 @@ export function useSchedules({
       if (fromDate) params.append("fromDate", fromDate);
       if (toDate) params.append("toDate", toDate);
       if (routeScheduleId) params.append("routeScheduleId", routeScheduleId);
+
+      // If user is company_admin, branch_admin or seller, automatically filter by their company
+      if (userCompanyId) {
+        params.append("companyId", userCompanyId);
+      }
 
       if (params.toString()) {
         url += `?${params.toString()}`;
@@ -270,7 +278,12 @@ export function useSchedules({
   // Create a new schedule
   const createSchedule = useMutation({
     mutationFn: async (data: ScheduleFormData) => {
-      const response = await axios.post("/api/schedules", data);
+      // If user is restricted to a company, enforce their company ID
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.post("/api/schedules", finalData);
       return response.data.schedule;
     },
     onSuccess: () => {
@@ -589,21 +602,30 @@ export function useSchedules({
   }, []);
 
   // Search schedules
-  const searchSchedules = useCallback(async (params: ScheduleSearchParams) => {
-    const searchParams = new URLSearchParams();
-    searchParams.append("originId", params.originId);
-    searchParams.append("destinationId", params.destinationId);
-    searchParams.append("departureDate", params.departureDate);
+  const searchSchedules = useCallback(
+    async (params: ScheduleSearchParams) => {
+      const searchParams = new URLSearchParams();
+      searchParams.append("originId", params.originId);
+      searchParams.append("destinationId", params.destinationId);
+      searchParams.append("departureDate", params.departureDate);
 
-    if (params.returnDate) searchParams.append("returnDate", params.returnDate);
-    if (params.passengers)
-      searchParams.append("passengers", params.passengers.toString());
+      if (params.returnDate)
+        searchParams.append("returnDate", params.returnDate);
+      if (params.passengers)
+        searchParams.append("passengers", params.passengers.toString());
 
-    const response = await axios.get(
-      `/api/schedules/search?${searchParams.toString()}`
-    );
-    return response.data;
-  }, []);
+      // If user is company_admin, branch_admin or seller, automatically filter by their company
+      if (userCompanyId) {
+        searchParams.append("companyId", userCompanyId);
+      }
+
+      const response = await axios.get(
+        `/api/schedules/search?${searchParams.toString()}`
+      );
+      return response.data;
+    },
+    [userCompanyId]
+  );
 
   // Search schedules by origin and destination
   const searchSchedulesByRoute = useCallback(
@@ -628,12 +650,17 @@ export function useSchedules({
       if (fromDate) params.append("fromDate", fromDate);
       if (toDate) params.append("toDate", toDate);
 
+      // If user is company_admin, branch_admin or seller, automatically filter by their company
+      if (userCompanyId) {
+        params.append("companyId", userCompanyId);
+      }
+
       const response = await axios.get(
         `/api/schedules/search?${params.toString()}`
       );
       return response.data.schedules;
     },
-    []
+    [userCompanyId]
   );
 
   return {
@@ -665,5 +692,7 @@ export function useSchedules({
     isCreatingTicket: createTicket.isPending,
     isCreatingParcel: createParcel.isPending,
     isGeneratingPassengerList: generatePassengerList.isPending,
+    userCompanyId,
+    isCompanyRestricted,
   };
 }

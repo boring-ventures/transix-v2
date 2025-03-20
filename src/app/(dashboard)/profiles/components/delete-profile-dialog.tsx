@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useProfiles } from "@/hooks/use-profiles";
 import {
   AlertDialog,
@@ -23,27 +23,51 @@ export function DeleteProfileDialog({
   profileId,
   onClose,
 }: DeleteProfileDialogProps) {
-  const { deleteProfile, isDeleting, fetchProfile } = useProfiles();
+  const { deleteProfile, isDeleting, fetchProfile, isCompanyRestricted } =
+    useProfiles();
   const [profileName, setProfileName] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Use a ref to store the fetchProfile function to avoid dependency issues
+  const fetchProfileRef = useCallback(
+    async (id: string) => {
+      try {
+        setIsLoading(true);
+        return await fetchProfile(id);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [fetchProfile]
+  );
 
   useEffect(() => {
+    let isMounted = true;
+
     if (profileId) {
-      const getProfileDetails = async () => {
-        try {
-          const profile = await fetchProfile(profileId);
-          setProfileName(profile.fullName);
-        } catch (err) {
+      fetchProfileRef(profileId)
+        .then((profile) => {
+          if (isMounted) {
+            setProfileName(profile.fullName);
+          }
+        })
+        .catch((err) => {
           console.error("Error al obtener detalles del usuario:", err);
-        }
-      };
-      getProfileDetails();
+          if (isMounted) {
+            setError("No se pudieron cargar los detalles del perfil");
+          }
+        });
     }
-  }, [profileId, fetchProfile]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [profileId, fetchProfileRef]);
 
   const handleDelete = async () => {
     if (!profileId) return;
-    
+
     setError(null);
     try {
       await deleteProfile.mutateAsync(profileId);
@@ -61,8 +85,8 @@ export function DeleteProfileDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>¿Está completamente seguro?</AlertDialogTitle>
           <AlertDialogDescription>
-            Esto eliminará el usuario <strong>{profileName}</strong> del sistema.
-            Esta acción no se puede deshacer.
+            Esto eliminará el usuario <strong>{profileName}</strong> del
+            sistema. Esta acción no se puede deshacer.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -95,4 +119,4 @@ export function DeleteProfileDialog({
       </AlertDialogContent>
     </AlertDialog>
   );
-} 
+}

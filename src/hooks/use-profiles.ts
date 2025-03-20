@@ -4,6 +4,7 @@ import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
 import type { Role } from "@prisma/client";
 import type { Company } from "@/hooks/use-companies";
+import { useCompanyFilter } from "./use-company-filter";
 
 export type Profile = {
   id: string;
@@ -45,8 +46,14 @@ export type ProfileFormData = {
   avatarUrl?: string | null;
 };
 
-export function useProfiles(companyId?: string, fetchInactive = false) {
+export function useProfiles(externalCompanyId?: string, fetchInactive = false) {
   const queryClient = useQueryClient();
+  const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
+
+  // If user is restricted to a company, use their company ID, otherwise use the provided one
+  const effectiveCompanyId = isCompanyRestricted
+    ? userCompanyId
+    : externalCompanyId;
 
   // Fetch all profiles (optionally filtered by company)
   const {
@@ -55,22 +62,22 @@ export function useProfiles(companyId?: string, fetchInactive = false) {
     error: profilesError,
     refetch: refetchProfiles,
   } = useQuery({
-    queryKey: ["profiles", { companyId, fetchInactive }],
+    queryKey: ["profiles", { effectiveCompanyId, fetchInactive }],
     queryFn: async () => {
       let url = "/api/profile";
       const params = new URLSearchParams();
-      
-      if (companyId) params.append("companyId", companyId);
+
+      if (effectiveCompanyId) params.append("companyId", effectiveCompanyId);
       if (!fetchInactive) params.append("active", "true");
-      
+
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
-      
+
       const response = await axios.get(url);
       return response.data.profiles;
     },
-    enabled: !!companyId || companyId === undefined, // Only fetch if companyId is provided or explicitly undefined
+    enabled: !!effectiveCompanyId || effectiveCompanyId === undefined, // Only fetch if companyId is provided or explicitly undefined
   });
 
   // Fetch a single profile by ID
@@ -82,7 +89,12 @@ export function useProfiles(companyId?: string, fetchInactive = false) {
   // Create a new profile
   const createProfile = useMutation({
     mutationFn: async (data: ProfileFormData & { userId: string }) => {
-      const response = await axios.post("/api/profile", data);
+      // If user is restricted to a company, enforce their company ID
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.post("/api/profile", finalData);
       return response.data.profile;
     },
     onSuccess: () => {
@@ -104,7 +116,12 @@ export function useProfiles(companyId?: string, fetchInactive = false) {
   // Update an existing profile
   const updateProfile = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ProfileFormData }) => {
-      const response = await axios.patch(`/api/profile/${id}`, data);
+      // For company admins, prevent changing company
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.patch(`/api/profile/${id}`, finalData);
       return response.data.profile;
     },
     onSuccess: () => {
@@ -125,16 +142,16 @@ export function useProfiles(companyId?: string, fetchInactive = false) {
 
   // Assign a company to a profile
   const assignCompany = useMutation({
-    mutationFn: async ({ 
-      id, 
-      companyId, 
-      branchId, 
-      role 
-    }: { 
-      id: string; 
-      companyId: string; 
-      branchId?: string; 
-      role?: Role 
+    mutationFn: async ({
+      id,
+      companyId,
+      branchId,
+      role,
+    }: {
+      id: string;
+      companyId: string;
+      branchId?: string;
+      role?: Role;
     }) => {
       const response = await axios.post(`/api/profile/${id}/assign-company`, {
         companyId,
@@ -182,17 +199,30 @@ export function useProfiles(companyId?: string, fetchInactive = false) {
   });
 
   // Search profiles
-  const searchProfiles = useCallback(async (query: string, options?: { companyId?: string; role?: Role; limit?: number }) => {
-    const params = new URLSearchParams();
-    params.append("q", query);
-    
-    if (options?.companyId) params.append("companyId", options.companyId);
-    if (options?.role) params.append("role", options.role);
-    if (options?.limit) params.append("limit", options.limit.toString());
-    
-    const response = await axios.get(`/api/profile/search?${params.toString()}`);
-    return response.data.profiles;
-  }, []);
+  const searchProfiles = useCallback(
+    async (
+      query: string,
+      options?: { companyId?: string; role?: Role; limit?: number }
+    ) => {
+      const params = new URLSearchParams();
+      params.append("q", query);
+
+      // If user is restricted to a company, use their company ID
+      const finalCompanyId = isCompanyRestricted
+        ? userCompanyId
+        : options?.companyId;
+
+      if (finalCompanyId) params.append("companyId", finalCompanyId);
+      if (options?.role) params.append("role", options.role);
+      if (options?.limit) params.append("limit", options.limit.toString());
+
+      const response = await axios.get(
+        `/api/profile/search?${params.toString()}`
+      );
+      return response.data.profiles;
+    },
+    [userCompanyId, isCompanyRestricted]
+  );
 
   return {
     profiles,
@@ -209,5 +239,7 @@ export function useProfiles(companyId?: string, fetchInactive = false) {
     isUpdating: updateProfile.isPending,
     isDeleting: deleteProfile.isPending,
     isAssigningCompany: assignCompany.isPending,
+    userCompanyId,
+    isCompanyRestricted,
   };
-} 
+}

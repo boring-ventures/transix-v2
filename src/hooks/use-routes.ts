@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
 import type { Location } from "@/hooks/use-locations";
+import { useCompanyFilter } from "./use-company-filter";
 
 export type Route = {
   id: string;
@@ -45,6 +46,7 @@ export type RouteFormData = {
 
 export function useRoutes(fetchInactive = false) {
   const queryClient = useQueryClient();
+  const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
 
   // Fetch all routes
   const {
@@ -53,13 +55,18 @@ export function useRoutes(fetchInactive = false) {
     error: routesError,
     refetch: refetchRoutes,
   } = useQuery({
-    queryKey: ["routes", { fetchInactive }],
+    queryKey: ["routes", { fetchInactive, userCompanyId }],
     queryFn: async () => {
       let url = "/api/routes";
       const params = new URLSearchParams();
 
       if (!fetchInactive) params.append("active", "true");
       params.append("include", "originLocation,destinationLocation");
+
+      // If user is company_admin, branch_admin or seller, automatically filter by their company
+      if (userCompanyId) {
+        params.append("companyId", userCompanyId);
+      }
 
       if (params.toString()) {
         url += `?${params.toString()}`;
@@ -85,7 +92,12 @@ export function useRoutes(fetchInactive = false) {
   // Create a new route
   const createRoute = useMutation({
     mutationFn: async (data: RouteFormData) => {
-      const response = await axios.post("/api/routes", data);
+      // If user is restricted to a company, enforce their company ID
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.post("/api/routes", finalData);
       return response.data.route;
     },
     onSuccess: () => {
@@ -112,7 +124,12 @@ export function useRoutes(fetchInactive = false) {
   // Update an existing route
   const updateRoute = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: RouteFormData }) => {
-      const response = await axios.patch(`/api/routes/${id}`, data);
+      // If user is restricted to a company, enforce their company ID
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.patch(`/api/routes/${id}`, finalData);
       return response.data.route;
     },
     onSuccess: () => {
@@ -204,12 +221,17 @@ export function useRoutes(fetchInactive = false) {
         params.append("destinationId", options.destinationId);
       if (options?.limit) params.append("limit", options.limit.toString());
 
+      // If user is company_admin, branch_admin or seller, automatically filter by their company
+      if (userCompanyId) {
+        params.append("companyId", userCompanyId);
+      }
+
       const response = await axios.get(
         `/api/routes/search?${params.toString()}`
       );
       return response.data.routes;
     },
-    []
+    [userCompanyId]
   );
 
   return {
@@ -228,5 +250,7 @@ export function useRoutes(fetchInactive = false) {
     isUpdating: updateRoute.isPending,
     isDeactivating: deactivateRoute.isPending,
     isDeleting: deleteRoute.isPending,
+    userCompanyId,
+    isCompanyRestricted,
   };
-} 
+}

@@ -6,6 +6,7 @@ import type { MaintenanceStatus } from "@prisma/client";
 import type { Company } from "@/hooks/use-companies";
 import type { BusTemplate, SeatMatrix } from "@/hooks/use-bus-templates";
 import type { BusSeat } from "@/hooks/use-bus-seats";
+import { useCompanyFilter } from "./use-company-filter";
 
 export type Bus = {
   id: string;
@@ -38,6 +39,7 @@ export type BusFormData = {
 
 export function useBuses(isActive?: boolean) {
   const queryClient = useQueryClient();
+  const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
 
   // Fetch all buses (optionally filtered by company and template)
   const {
@@ -46,7 +48,7 @@ export function useBuses(isActive?: boolean) {
     error: busesError,
     refetch: refetchBuses,
   } = useQuery({
-    queryKey: ["buses", { isActive }],
+    queryKey: ["buses", { isActive, userCompanyId }],
     queryFn: async () => {
       let url = "/api/buses";
       const params = new URLSearchParams();
@@ -54,6 +56,11 @@ export function useBuses(isActive?: boolean) {
       // Only add isActive param if it's explicitly defined (not undefined)
       if (isActive !== undefined) {
         params.append("isActive", String(isActive));
+      }
+
+      // If user is company_admin, branch_admin or seller, automatically filter by their company
+      if (userCompanyId) {
+        params.append("companyId", userCompanyId);
       }
 
       if (params.toString()) {
@@ -83,7 +90,12 @@ export function useBuses(isActive?: boolean) {
   // Create a new bus
   const createBus = useMutation({
     mutationFn: async (data: BusFormData) => {
-      const response = await axios.post("/api/buses", data);
+      // If user is restricted to a company, enforce their company ID
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.post("/api/buses", finalData);
       return response.data.bus;
     },
     onSuccess: () => {
@@ -270,5 +282,7 @@ export function useBuses(isActive?: boolean) {
     isDeleting: deleteBus.isPending,
     isUpdatingMaintenance: updateMaintenanceStatus.isPending,
     isUpdatingSeats: updateBusSeats.isPending,
+    userCompanyId,
+    isCompanyRestricted,
   };
 }

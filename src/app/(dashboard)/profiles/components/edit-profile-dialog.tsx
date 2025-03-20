@@ -60,7 +60,7 @@ export function EditProfileDialog({
   onOpenChange,
   profile,
 }: EditProfileDialogProps) {
-  const { updateProfile, isUpdating, assignCompany, isAssigningCompany } =
+  const { updateProfile, isUpdating, userCompanyId, isCompanyRestricted } =
     useProfiles();
   const { companies, isLoadingCompanies } = useCompanies(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,25 +86,40 @@ export function EditProfileDialog({
   // Update form values when profile changes
   useEffect(() => {
     if (profile) {
+      const effectiveCompanyId = isCompanyRestricted
+        ? userCompanyId
+        : profile.companyId;
+
       form.reset({
         fullName: profile.fullName,
         email: profile.email || "",
         role: profile.role,
         active: profile.active,
-        companyId: profile.companyId || "",
+        companyId: effectiveCompanyId || "",
         branchId: profile.branchId || "",
       });
+    }
+  }, [profile, isCompanyRestricted, userCompanyId, form]);
 
-      if (profile.companyId) {
+  // Set selected company separately to avoid circular dependencies
+  useEffect(() => {
+    if (profile) {
+      const effectiveCompanyId = isCompanyRestricted
+        ? userCompanyId
+        : profile.companyId;
+
+      if (effectiveCompanyId) {
         const company = companies.find(
-          (c: Company) => c.id === profile.companyId
+          (c: Company) => c.id === effectiveCompanyId
         );
         if (company) {
           setSelectedCompany(company);
         }
+      } else {
+        setSelectedCompany(null);
       }
     }
-  }, [profile, form, companies]);
+  }, [profile, companies, isCompanyRestricted, userCompanyId]);
 
   // Update branches when company changes
   const handleCompanyChange = (companyId: string) => {
@@ -126,6 +141,12 @@ export function EditProfileDialog({
     if (!profile) return;
 
     setError(null);
+
+    // Restrict company admins from creating superadmins
+    if (isCompanyRestricted && data.role === "superadmin") {
+      setError("No tiene permisos para crear un Super Admin");
+      return;
+    }
 
     // Validate data before submitting
     if (data.role !== "superadmin" && !data.companyId) {
@@ -157,7 +178,9 @@ export function EditProfileDialog({
         updateData.branchId = null;
       } else {
         // For other roles, use the selected values
-        updateData.companyId = data.companyId || null;
+        updateData.companyId = isCompanyRestricted
+          ? userCompanyId
+          : data.companyId;
         updateData.branchId = data.branchId || null;
       }
 
@@ -237,7 +260,10 @@ export function EditProfileDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      {/* Only show superadmin option for non-restricted users */}
+                      {!isCompanyRestricted && (
+                        <SelectItem value="superadmin">Super Admin</SelectItem>
+                      )}
                       <SelectItem value="company_admin">
                         Admin de Empresa
                       </SelectItem>
@@ -252,45 +278,51 @@ export function EditProfileDialog({
               )}
             />
 
-            {/* Only show company and branch fields for non-superadmin roles */}
             {!isSuperAdmin && (
               <>
-                <FormField
-                  control={form.control}
-                  name="companyId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Empresa</FormLabel>
-                      <Select
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          handleCompanyChange(value);
-                        }}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar empresa" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {isLoadingCompanies ? (
-                            <SelectItem value="loading" disabled>
-                              Cargando empresas...
-                            </SelectItem>
-                          ) : (
-                            companies.map((company: Company) => (
+                {/* Only show company selection for non-restricted users */}
+                {!isCompanyRestricted ? (
+                  <FormField
+                    control={form.control}
+                    name="companyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Empresa</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            handleCompanyChange(value);
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar empresa" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {companies.map((company) => (
                               <SelectItem key={company.id} value={company.id}>
                                 {company.name}
                               </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  // Show selected company name for restricted users
+                  selectedCompany && (
+                    <div className="flex flex-col space-y-1.5 mb-4">
+                      <div className="text-sm font-medium">Empresa</div>
+                      <div className="border rounded-md p-2 bg-muted/50">
+                        {selectedCompany.name}
+                      </div>
+                    </div>
+                  )
+                )}
 
                 <FormField
                   control={form.control}
@@ -310,7 +342,7 @@ export function EditProfileDialog({
                         </FormControl>
                         <SelectContent>
                           {branches.length === 0 ? (
-                            <SelectItem value="none" disabled>
+                            <SelectItem value="no_branches" disabled>
                               No hay sucursales disponibles
                             </SelectItem>
                           ) : (
@@ -351,20 +383,21 @@ export function EditProfileDialog({
             />
 
             {error && (
-              <p className="text-sm font-medium text-destructive">{error}</p>
+              <div className="bg-destructive/20 text-destructive text-sm p-2 rounded-md">
+                {error}
+              </div>
             )}
 
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={isUpdating || isAssigningCompany}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isUpdating || isAssigningCompany}>
-                {(isUpdating || isAssigningCompany) && (
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Guardar Cambios

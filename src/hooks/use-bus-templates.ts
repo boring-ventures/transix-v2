@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
 import type { Company } from "@/hooks/use-companies";
+import { useCompanyFilter } from "./use-company-filter";
 
 export type BusTemplate = {
   id: string;
@@ -86,7 +87,7 @@ export enum BusType {
   STANDARD = "standard",
   LUXURY = "luxury",
   MINIBUS = "minibus",
-  DOUBLE_DECKER = "double_decker"
+  DOUBLE_DECKER = "double_decker",
 }
 
 /**
@@ -103,32 +104,37 @@ export interface SeatMatrix {
   };
 }
 
-export function useBusTemplates(companyId?: string, fetchInactive = false) {
+export function useBusTemplates(isActive?: boolean) {
   const queryClient = useQueryClient();
+  const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
 
-  // Fetch all bus templates (optionally filtered by company)
   const {
     data: templates = [],
     isLoading: isLoadingTemplates,
     error: templatesError,
     refetch: refetchTemplates,
   } = useQuery({
-    queryKey: ["busTemplates", { companyId, fetchInactive }],
+    queryKey: ["busTemplates", { isActive, userCompanyId }],
     queryFn: async () => {
       let url = "/api/bus-templates";
       const params = new URLSearchParams();
-      
-      if (companyId) params.append("companyId", companyId);
-      if (!fetchInactive) params.append("isActive", "true");
-      
+
+      if (isActive !== undefined) {
+        params.append("isActive", String(isActive));
+      }
+
+      // If user is company_admin, branch_admin or seller, automatically filter by their company
+      if (userCompanyId) {
+        params.append("companyId", userCompanyId);
+      }
+
       if (params.toString()) {
         url += `?${params.toString()}`;
       }
-      
+
       const response = await axios.get(url);
-      return response.data.templates;
+      return response.data.templates || [];
     },
-    enabled: !!companyId || companyId === undefined, // Only fetch if companyId is provided or explicitly undefined
   });
 
   // Fetch a single bus template by ID
@@ -140,7 +146,12 @@ export function useBusTemplates(companyId?: string, fetchInactive = false) {
   // Create a new bus template
   const createTemplate = useMutation({
     mutationFn: async (data: BusTemplateFormData) => {
-      const response = await axios.post("/api/bus-templates", data);
+      // If user is restricted to a company, enforce their company ID
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.post("/api/bus-templates", finalData);
       return response.data.template;
     },
     onSuccess: () => {
@@ -213,16 +224,21 @@ export function useBusTemplates(companyId?: string, fetchInactive = false) {
   });
 
   // Search bus templates
-  const searchTemplates = useCallback(async (query: string, options?: { companyId?: string; limit?: number }) => {
-    const params = new URLSearchParams();
-    params.append("q", query);
-    
-    if (options?.companyId) params.append("companyId", options.companyId);
-    if (options?.limit) params.append("limit", options.limit.toString());
-    
-    const response = await axios.get(`/api/bus-templates/search?${params.toString()}`);
-    return response.data.templates;
-  }, []);
+  const searchTemplates = useCallback(
+    async (query: string, options?: { companyId?: string; limit?: number }) => {
+      const params = new URLSearchParams();
+      params.append("q", query);
+
+      if (options?.companyId) params.append("companyId", options.companyId);
+      if (options?.limit) params.append("limit", options.limit.toString());
+
+      const response = await axios.get(
+        `/api/bus-templates/search?${params.toString()}`
+      );
+      return response.data.templates;
+    },
+    []
+  );
 
   return {
     templates,
@@ -237,5 +253,7 @@ export function useBusTemplates(companyId?: string, fetchInactive = false) {
     isCreating: createTemplate.isPending,
     isUpdating: updateTemplate.isPending,
     isDeleting: deleteTemplate.isPending,
+    userCompanyId,
+    isCompanyRestricted,
   };
-} 
+}

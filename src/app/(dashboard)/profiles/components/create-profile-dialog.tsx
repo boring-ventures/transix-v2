@@ -57,7 +57,8 @@ export function CreateProfileDialog({
   onOpenChange,
 }: CreateProfileDialogProps) {
   const { signUp } = useAuth();
-  const { createProfile, isCreating } = useProfiles();
+  const { createProfile, isCreating, userCompanyId, isCompanyRestricted } =
+    useProfiles();
   const { companies, isLoadingCompanies } = useCompanies(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -71,13 +72,22 @@ export function CreateProfileDialog({
       fullName: "",
       role: "seller",
       active: true,
-      companyId: "",
+      companyId: isCompanyRestricted ? userCompanyId || "" : "",
       branchId: "",
     },
   });
 
   const role = form.watch("role");
   const isSuperAdmin = role === "superadmin";
+
+  useEffect(() => {
+    if (isCompanyRestricted && userCompanyId) {
+      form.setValue("companyId", userCompanyId);
+
+      const company = companies.find((c: Company) => c.id === userCompanyId);
+      setSelectedCompany(company || null);
+    }
+  }, [isCompanyRestricted, userCompanyId, form, companies]);
 
   const handleCompanyChange = (companyId: string) => {
     const company = companies.find((c: Company) => c.id === companyId);
@@ -95,6 +105,11 @@ export function CreateProfileDialog({
 
   const onSubmit = async (data: CreateProfileFormValues) => {
     setError(null);
+
+    if (isCompanyRestricted && data.role === "superadmin") {
+      setError("No tiene permisos para crear un Super Admin");
+      return;
+    }
 
     if (data.role !== "superadmin" && !data.companyId) {
       setError("Debe seleccionar una empresa para este rol");
@@ -217,7 +232,9 @@ export function CreateProfileDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      {!isCompanyRestricted && (
+                        <SelectItem value="superadmin">Super Admin</SelectItem>
+                      )}
                       <SelectItem value="company_admin">
                         Admin de Empresa
                       </SelectItem>
@@ -234,42 +251,47 @@ export function CreateProfileDialog({
 
             {!isSuperAdmin && (
               <>
-                <FormField
-                  control={form.control}
-                  name="companyId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Empresa</FormLabel>
-                      <Select
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          handleCompanyChange(value);
-                        }}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar empresa" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {isLoadingCompanies ? (
-                            <SelectItem value="loading" disabled>
-                              Cargando empresas...
-                            </SelectItem>
-                          ) : (
-                            companies.map((company: Company) => (
+                {!isCompanyRestricted ? (
+                  <FormField
+                    control={form.control}
+                    name="companyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Empresa</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            handleCompanyChange(value);
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar empresa" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {companies.map((company) => (
                               <SelectItem key={company.id} value={company.id}>
                                 {company.name}
                               </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  selectedCompany && (
+                    <div className="flex flex-col space-y-1.5 mb-4">
+                      <div className="text-sm font-medium">Empresa</div>
+                      <div className="border rounded-md p-2 bg-muted/50">
+                        {selectedCompany.name}
+                      </div>
+                    </div>
+                  )
+                )}
 
                 <FormField
                   control={form.control}
@@ -289,7 +311,7 @@ export function CreateProfileDialog({
                         </FormControl>
                         <SelectContent>
                           {branches.length === 0 ? (
-                            <SelectItem value="none" disabled>
+                            <SelectItem value="no_branches" disabled>
                               No hay sucursales disponibles
                             </SelectItem>
                           ) : (
@@ -330,15 +352,16 @@ export function CreateProfileDialog({
             />
 
             {error && (
-              <p className="text-sm font-medium text-destructive">{error}</p>
+              <div className="bg-destructive/20 text-destructive text-sm p-2 rounded-md">
+                {error}
+              </div>
             )}
 
-            <DialogFooter>
+            <DialogFooter className="mt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={isCreating}
               >
                 Cancelar
               </Button>

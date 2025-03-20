@@ -76,7 +76,9 @@ export function AssignCompanyDialog({
       });
 
       if (profile.companyId) {
-        const company = companies.find((c: Company) => c.id === profile.companyId);
+        const company = companies.find(
+          (c: Company) => c.id === profile.companyId
+        );
         if (company) {
           setSelectedCompany(company);
         }
@@ -183,7 +185,7 @@ export function AssignCompanyDialog({
                     </FormControl>
                     <SelectContent>
                       {branches.length === 0 ? (
-                        <SelectItem value="none" disabled>
+                        <SelectItem value="no_branches" disabled>
                           No hay sucursales disponibles
                         </SelectItem>
                       ) : (
