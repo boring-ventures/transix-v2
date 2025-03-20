@@ -72,7 +72,7 @@ export async function GET() {
 
       const onTimeTrips = tripsWithBothTimes.filter((trip) => {
         const departureTime = new Date(trip.departureTime);
-        const arrivalTime = new Date(trip.arrivalTime);
+        const arrivalTime = new Date(trip.arrivalTime!);
         const estimatedDuration = departureTime.getTime() + 4 * 60 * 60 * 1000; // Assuming 4 hours is average trip duration
         const actualArrival = arrivalTime.getTime();
 
