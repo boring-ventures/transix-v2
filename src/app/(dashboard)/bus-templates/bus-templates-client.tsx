@@ -10,15 +10,22 @@ import { LoadingTable } from "@/components/table/loading-table";
 import { CreateBusTemplateDialog } from "./components/create-bus-template-dialog";
 import { DeleteBusTemplateDialog } from "./components/delete-bus-template-dialog";
 import type { Column } from "@/components/table/types";
+import { CompanyFilterDisplay } from "@/components/company/company-filter-display";
 
 export default function BusTemplatesClient() {
   const router = useRouter();
-  const { templates, isLoadingTemplates } = useBusTemplates();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const { templates, isLoadingTemplates, isCompanyRestricted } =
+    useBusTemplates(undefined, selectedCompanyId);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
   const handleViewTemplate = (template: BusTemplate) => {
     router.push(`/bus-templates/${template.id}`);
+  };
+
+  const handleCompanyChange = (companyId: string) => {
+    setSelectedCompanyId(companyId);
   };
 
   const columns: Column<BusTemplate>[] = [
@@ -28,12 +35,17 @@ export default function BusTemplatesClient() {
       accessorKey: "name",
       sortable: true,
     },
-    {
-      id: "company",
-      header: "Empresa",
-      accessorKey: "company",
-      cell: ({ row }) => row.company?.name || "Sin empresa",
-    },
+    // Only show company column for non-restricted users
+    ...(isCompanyRestricted
+      ? []
+      : [
+          {
+            id: "company",
+            header: "Empresa",
+            accessorKey: "company",
+            cell: ({ row }) => row.company?.name || "Sin empresa",
+          } as Column<BusTemplate>,
+        ]),
     {
       id: "type",
       header: "Tipo",
@@ -73,8 +85,12 @@ export default function BusTemplatesClient() {
 
   return (
     <div className="container mx-auto py-6">
+      {!isCompanyRestricted && (
+        <CompanyFilterDisplay onCompanyChange={handleCompanyChange} />
+      )}
+
       {isLoadingTemplates ? (
-        <LoadingTable columnCount={6} rowCount={5} />
+        <LoadingTable columnCount={isCompanyRestricted ? 5 : 6} rowCount={5} />
       ) : (
         <DataTable
           title="Plantillas de Bus"
@@ -101,4 +117,4 @@ export default function BusTemplatesClient() {
       />
     </div>
   );
-} 
+}

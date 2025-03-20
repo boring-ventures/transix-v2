@@ -63,7 +63,7 @@ export function CreateSchedulePage() {
   const router = useRouter();
   const { createSchedule, isCreating } = useSchedules();
   const { buses, isLoadingBuses } = useBuses(true);
-  const { drivers, isLoadingDrivers } = useDrivers(true);
+  const { drivers, isLoadingDrivers } = useDrivers(undefined, true);
   const { routes, isLoading: isLoadingRoutes } = useRoutes();
   const [selectedRouteId, setSelectedRouteId] = useState<string>("");
   const { routeSchedules, isLoadingRouteSchedules } = useRouteSchedules({

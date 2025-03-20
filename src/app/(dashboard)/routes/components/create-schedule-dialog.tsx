@@ -76,7 +76,7 @@ export function CreateScheduleDialog({
 }: CreateScheduleDialogProps) {
   const { createSchedule, isCreating } = useSchedules();
   const { buses, isLoadingBuses } = useBuses(true);
-  const { drivers, isLoadingDrivers } = useDrivers(true);
+  const { drivers, isLoadingDrivers } = useDrivers(undefined, true);
   const { routeSchedules, isLoadingRouteSchedules } = useRouteSchedules({
     routeId,
     active: true,

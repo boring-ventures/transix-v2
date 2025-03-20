@@ -14,6 +14,7 @@ interface BusesTableProps {
   title: string;
   description: string;
   onAdd: () => void;
+  isCompanyRestricted?: boolean;
 }
 
 export function BusesTable({
@@ -21,6 +22,7 @@ export function BusesTable({
   title,
   description,
   onAdd,
+  isCompanyRestricted = false,
 }: BusesTableProps) {
   const router = useRouter();
   const [busToDelete, setBusToDelete] = useState<string | null>(null);
@@ -58,9 +60,11 @@ export function BusesTable({
       cell: ({ row }) => (
         <div>
           <div className="font-medium">{row.plateNumber}</div>
-          <div className="text-sm text-muted-foreground">
-            {row.company?.name || "Sin empresa"}
-          </div>
+          {!isCompanyRestricted && (
+            <div className="text-sm text-muted-foreground">
+              {row.company?.name || "Sin empresa"}
+            </div>
+          )}
         </div>
       ),
     },

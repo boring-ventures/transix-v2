@@ -10,16 +10,23 @@ import { CreateDriverDialog } from "./components/create-driver-dialog";
 import { EditDriverDialog } from "./components/edit-driver-dialog";
 import { DeleteDriverDialog } from "./components/delete-driver-dialog";
 import type { Column } from "@/components/table/types";
+import { CompanyFilterDisplay } from "@/components/company/company-filter-display";
 
 export default function DriversClient() {
   const router = useRouter();
-  const { drivers, isLoadingDrivers } = useDrivers();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const { drivers, isLoadingDrivers, isCompanyRestricted } =
+    useDrivers(selectedCompanyId);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
   const [driverToDelete, setDriverToDelete] = useState<string | null>(null);
 
   const handleViewDriver = (driver: Driver) => {
     router.push(`/drivers/${driver.id}`);
+  };
+
+  const handleCompanyChange = (companyId: string) => {
+    setSelectedCompanyId(companyId);
   };
 
   const columns: Column<Driver>[] = [
@@ -46,18 +53,19 @@ export default function DriversClient() {
       header: "Categoría",
       accessorKey: "licenseCategory",
       sortable: true,
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {row.licenseCategory}
-        </Badge>
-      ),
+      cell: ({ row }) => <Badge variant="outline">{row.licenseCategory}</Badge>,
     },
-    {
-      id: "company",
-      header: "Empresa",
-      accessorKey: "company",
-      cell: ({ row }) => row.company?.name || "Sin empresa",
-    },
+    // Only show company column for non-restricted users
+    ...(isCompanyRestricted
+      ? []
+      : [
+          {
+            id: "company",
+            header: "Empresa",
+            accessorKey: "company",
+            cell: ({ row }) => row.company?.name || "Sin empresa",
+          } as Column<Driver>,
+        ]),
     {
       id: "trips",
       header: "Viajes",
@@ -83,8 +91,12 @@ export default function DriversClient() {
 
   return (
     <div className="container mx-auto py-6">
+      {!isCompanyRestricted && (
+        <CompanyFilterDisplay onCompanyChange={handleCompanyChange} />
+      )}
+
       {isLoadingDrivers ? (
-        <LoadingTable columnCount={7} rowCount={5} />
+        <LoadingTable columnCount={isCompanyRestricted ? 6 : 7} rowCount={5} />
       ) : (
         <DataTable
           title="Lista de Conductores"
@@ -118,4 +130,4 @@ export default function DriversClient() {
       />
     </div>
   );
-} 
+}

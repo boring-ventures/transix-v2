@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "@/components/ui/use-toast";
+import { useCompanyFilter } from "./use-company-filter";
 
 export type Driver = {
   id: string;
@@ -43,8 +44,6 @@ export type DriverStats = {
   }>;
 };
 
-
-
 export type DriverFormData = {
   fullName: string;
   documentId: string;
@@ -54,24 +53,48 @@ export type DriverFormData = {
   active?: boolean;
 };
 
-export function useDrivers(active?: boolean) {
+export function useDrivers(externalCompanyId?: string, active?: boolean) {
   const queryClient = useQueryClient();
+  const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
+
+  // If user is restricted to a company, use their company ID, otherwise use the provided one
+  const effectiveCompanyId = isCompanyRestricted
+    ? userCompanyId
+    : externalCompanyId;
 
   // Inside the hook, convert the boolean to a string for the API call
   const activeParam = active !== undefined ? active.toString() : undefined;
 
-  // Fetch all drivers (active by default)
+  // Fetch all drivers (active by default) with company filter
   const {
     data: drivers = [],
     isLoading: isLoadingDrivers,
     error: driversError,
     refetch: refetchDrivers,
   } = useQuery({
-    queryKey: ["drivers", { active: activeParam }],
+    queryKey: [
+      "drivers",
+      { active: activeParam, companyId: effectiveCompanyId },
+    ],
     queryFn: async () => {
-      const response = await axios.get(
-        `/api/drivers${activeParam ? `?active=${activeParam}` : "?active=true"}`
-      );
+      let url = "/api/drivers";
+      const params = new URLSearchParams();
+
+      if (activeParam !== undefined) {
+        params.append("active", activeParam);
+      } else {
+        params.append("active", "true");
+      }
+
+      if (effectiveCompanyId) {
+        params.append("companyId", effectiveCompanyId);
+      }
+
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
+      const response = await axios.get(url);
       return response.data.drivers;
     },
   });
@@ -91,7 +114,12 @@ export function useDrivers(active?: boolean) {
   // Create a new driver
   const createDriver = useMutation({
     mutationFn: async (data: DriverFormData) => {
-      const response = await axios.post("/api/drivers", data);
+      // If user is restricted to a company, enforce their company ID
+      const finalData = isCompanyRestricted
+        ? { ...data, companyId: userCompanyId }
+        : data;
+
+      const response = await axios.post("/api/drivers", finalData);
       return response.data.driver;
     },
     onSuccess: () => {
@@ -106,7 +134,7 @@ export function useDrivers(active?: boolean) {
         axios.isAxiosError(error) && error.response?.data?.error
           ? error.response.data.error
           : "Error al crear el conductor";
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -133,7 +161,7 @@ export function useDrivers(active?: boolean) {
         axios.isAxiosError(error) && error.response?.data?.error
           ? error.response.data.error
           : "Error al actualizar el conductor";
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -171,8 +199,16 @@ export function useDrivers(active?: boolean) {
 
   // Assign company to driver
   const assignCompany = useMutation({
-    mutationFn: async ({ id, companyId }: { id: string; companyId: string }) => {
-      const response = await axios.post(`/api/drivers/${id}/assign-company`, { companyId });
+    mutationFn: async ({
+      id,
+      companyId,
+    }: {
+      id: string;
+      companyId: string;
+    }) => {
+      const response = await axios.post(`/api/drivers/${id}/assign-company`, {
+        companyId,
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -197,14 +233,17 @@ export function useDrivers(active?: boolean) {
   });
 
   // Search drivers
-  const searchDrivers = useCallback(async (query: string, companyId?: string) => {
-    const url = new URL("/api/drivers/search", window.location.origin);
-    url.searchParams.append("q", query);
-    if (companyId) url.searchParams.append("companyId", companyId);
-    
-    const response = await axios.get(url.toString());
-    return response.data.drivers;
-  }, []);
+  const searchDrivers = useCallback(
+    async (query: string, companyId?: string) => {
+      const url = new URL("/api/drivers/search", window.location.origin);
+      url.searchParams.append("q", query);
+      if (companyId) url.searchParams.append("companyId", companyId);
+
+      const response = await axios.get(url.toString());
+      return response.data.drivers;
+    },
+    []
+  );
 
   return {
     drivers,
@@ -222,5 +261,7 @@ export function useDrivers(active?: boolean) {
     isUpdating: updateDriver.isPending,
     isDeleting: deleteDriver.isPending,
     isAssigningCompany: assignCompany.isPending,
+    userCompanyId,
+    isCompanyRestricted,
   };
-} 
+}

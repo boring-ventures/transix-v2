@@ -73,7 +73,7 @@ export function EditScheduleDialog({
 }: EditScheduleDialogProps) {
   const { updateSchedule, isUpdating } = useSchedules();
   const { buses, isLoadingBuses } = useBuses(true);
-  const { drivers, isLoadingDrivers } = useDrivers(true);
+  const { drivers, isLoadingDrivers } = useDrivers(undefined, true);
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<EditScheduleFormValues>({
@@ -90,7 +90,7 @@ export function EditScheduleDialog({
 
   const onSubmit = async (data: EditScheduleFormValues) => {
     setError(null);
-    
+
     try {
       const updatedSchedule = await updateSchedule.mutateAsync({
         id: schedule.id,
@@ -106,7 +106,7 @@ export function EditScheduleDialog({
           price: data.price,
         },
       });
-      
+
       onUpdate(updatedSchedule);
       onOpenChange(false);
     } catch {
@@ -250,7 +250,10 @@ export function EditScheduleDialog({
                               } else {
                                 // Default to current time if no time was set before
                                 const now = new Date();
-                                newDate.setHours(now.getHours(), now.getMinutes());
+                                newDate.setHours(
+                                  now.getHours(),
+                                  now.getMinutes()
+                                );
                               }
                               field.onChange(newDate);
                             }
@@ -262,10 +265,10 @@ export function EditScheduleDialog({
                               // Compare only the date part, not the time
                               const departureDateOnly = new Date(departureDate);
                               departureDateOnly.setHours(0, 0, 0, 0);
-                              
+
                               const dateToCheck = new Date(date);
                               dateToCheck.setHours(0, 0, 0, 0);
-                              
+
                               return dateToCheck < departureDateOnly;
                             }
                             return date < new Date();
@@ -275,28 +278,38 @@ export function EditScheduleDialog({
                         <div className="p-3 border-t border-border">
                           <Input
                             type="time"
-                            value={field.value ? format(field.value, "HH:mm") : ""}
+                            value={
+                              field.value ? format(field.value, "HH:mm") : ""
+                            }
                             onChange={(e) => {
-                              const [hours, minutes] = e.target.value.split(":");
-                              const newDate = new Date(field.value || new Date());
+                              const [hours, minutes] =
+                                e.target.value.split(":");
+                              const newDate = new Date(
+                                field.value || new Date()
+                              );
                               newDate.setHours(
                                 Number.parseInt(hours),
                                 Number.parseInt(minutes)
                               );
-                              
+
                               // Ensure arrival time is after departure time on the same day
                               const departureDate = form.watch("departureDate");
-                              if (departureDate && isSameDay(departureDate, newDate)) {
+                              if (
+                                departureDate &&
+                                isSameDay(departureDate, newDate)
+                              ) {
                                 const departureTime = departureDate.getTime();
                                 const arrivalTime = newDate.getTime();
-                                
+
                                 if (arrivalTime <= departureTime) {
                                   // If arrival time is before or equal to departure time,
                                   // set it to departure time + 15 minutes
-                                  newDate.setTime(departureTime + 15 * 60 * 1000);
+                                  newDate.setTime(
+                                    departureTime + 15 * 60 * 1000
+                                  );
                                 }
                               }
-                              
+
                               field.onChange(newDate);
                             }}
                           />
@@ -451,4 +464,4 @@ export function EditScheduleDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}

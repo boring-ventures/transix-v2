@@ -104,9 +104,14 @@ export interface SeatMatrix {
   };
 }
 
-export function useBusTemplates(isActive?: boolean) {
+export function useBusTemplates(isActive?: boolean, externalCompanyId?: string) {
   const queryClient = useQueryClient();
   const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
+
+  // If user is restricted to a company, use their company ID, otherwise use the provided one
+  const effectiveCompanyId = isCompanyRestricted
+    ? userCompanyId
+    : externalCompanyId;
 
   const {
     data: templates = [],
@@ -114,7 +119,7 @@ export function useBusTemplates(isActive?: boolean) {
     error: templatesError,
     refetch: refetchTemplates,
   } = useQuery({
-    queryKey: ["busTemplates", { isActive, userCompanyId }],
+    queryKey: ["busTemplates", { isActive, companyId: effectiveCompanyId }],
     queryFn: async () => {
       let url = "/api/bus-templates";
       const params = new URLSearchParams();
@@ -123,9 +128,9 @@ export function useBusTemplates(isActive?: boolean) {
         params.append("isActive", String(isActive));
       }
 
-      // If user is company_admin, branch_admin or seller, automatically filter by their company
-      if (userCompanyId) {
-        params.append("companyId", userCompanyId);
+      // If there's a company filter, apply it
+      if (effectiveCompanyId) {
+        params.append("companyId", effectiveCompanyId);
       }
 
       if (params.toString()) {

@@ -37,9 +37,14 @@ export type BusFormData = {
   maintenanceStatus?: MaintenanceStatus;
 };
 
-export function useBuses(isActive?: boolean) {
+export function useBuses(isActive?: boolean, externalCompanyId?: string) {
   const queryClient = useQueryClient();
   const { companyId: userCompanyId, isCompanyRestricted } = useCompanyFilter();
+
+  // If user is restricted to a company, use their company ID, otherwise use the provided one
+  const effectiveCompanyId = isCompanyRestricted
+    ? userCompanyId
+    : externalCompanyId;
 
   // Fetch all buses (optionally filtered by company and template)
   const {
@@ -48,7 +53,7 @@ export function useBuses(isActive?: boolean) {
     error: busesError,
     refetch: refetchBuses,
   } = useQuery({
-    queryKey: ["buses", { isActive, userCompanyId }],
+    queryKey: ["buses", { isActive, companyId: effectiveCompanyId }],
     queryFn: async () => {
       let url = "/api/buses";
       const params = new URLSearchParams();
@@ -58,9 +63,9 @@ export function useBuses(isActive?: boolean) {
         params.append("isActive", String(isActive));
       }
 
-      // If user is company_admin, branch_admin or seller, automatically filter by their company
-      if (userCompanyId) {
-        params.append("companyId", userCompanyId);
+      // Apply company filter if needed
+      if (effectiveCompanyId) {
+        params.append("companyId", effectiveCompanyId);
       }
 
       if (params.toString()) {
