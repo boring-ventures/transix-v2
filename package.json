@@ -14,7 +14,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "populate-schedule-seats": "tsx scripts/populate-schedule-seats.ts"
+    "populate-schedule-seats": "tsx scripts/populate-schedule-seats.ts",
+    "create-superadmin": "tsx scripts/create-superadmin.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:quick-seed": "tsx prisma/quick-seed.ts",
+    "db:reset": "npx prisma migrate reset --force && npm run db:seed"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.0",
@@ -44,7 +48,9 @@
     "@tanstack/react-query": "^5.66.7",
     "@tanstack/react-query-devtools": "^5.66.7",
     "@tanstack/react-table": "^8.21.2",
+    "@types/bcryptjs": "^2.4.6",
     "axios": "^1.7.9",
+    "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.0",
